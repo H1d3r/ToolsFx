@@ -1,5 +1,6 @@
 package me.leon.controller
 
+import me.leon.DEBUG
 import me.leon.ext.*
 import me.leon.ext.crypto.*
 import tornadofx.*
@@ -16,17 +17,18 @@ class AsymmetricCryptoController : Controller() {
         outputEncode: String = "base64"
     ): String =
         catch({ "encrypt error: $it}" }) {
-            println("encrypt $key  $alg $data")
-            if (isSingleLine)
+            if (DEBUG) println("encrypt $key  $alg $data")
+            if (isSingleLine) {
                 data.lineAction2String {
                     it.decodeToByteArray(inputEncode)
                         .pubEncrypt(key, alg, reserved)
                         .encodeTo(outputEncode)
                 }
-            else
+            } else {
                 data.decodeToByteArray(inputEncode)
                     .pubEncrypt(key, alg, reserved)
                     .encodeTo(outputEncode)
+            }
         }
 
     fun lengthFromPub(key: String): Int = key.toPublicKey("RSA")!!.bitLength()
@@ -42,14 +44,16 @@ class AsymmetricCryptoController : Controller() {
         outputEncode: String = "raw"
     ): String =
         catch({ "decrypt error: $it" }) {
-            println("decrypt $key  $alg $data")
-            if (isSingleLine)
+            if (DEBUG) println("decrypt $key  $alg $data")
+            if (isSingleLine) {
                 data.lineAction2String {
                     it.decodeToByteArray(inputEncode)
                         .privateDecrypt(key, alg)
                         .encodeTo(outputEncode)
                 }
-            else data.decodeToByteArray(inputEncode).privateDecrypt(key, alg).encodeTo(outputEncode)
+            } else {
+                data.decodeToByteArray(inputEncode).privateDecrypt(key, alg).encodeTo(outputEncode)
+            }
         }
 
     fun priEncrypt(
@@ -62,16 +66,17 @@ class AsymmetricCryptoController : Controller() {
         outputEncode: String = "base64"
     ): String =
         catch({ "encrypt error: $it" }) {
-            if (isSingleLine)
+            if (isSingleLine) {
                 data.lineAction2String {
                     it.decodeToByteArray(inputEncode)
                         .privateEncrypt(key, alg, reserved)
                         .encodeTo(outputEncode)
                 }
-            else
+            } else {
                 data.decodeToByteArray(inputEncode)
                     .privateEncrypt(key, alg, reserved)
                     .encodeTo(outputEncode)
+            }
         }
 
     fun pubDecrypt(
@@ -83,11 +88,11 @@ class AsymmetricCryptoController : Controller() {
         outputEncode: String = "raw"
     ) =
         catch({ "decrypt error: $it" }) {
-            println("decrypt $key  $alg $data")
-            if (isSingleLine)
+            if (DEBUG) println("decrypt $key  $alg $data")
+            if (isSingleLine) {
                 data.lineAction2String {
                     it.decodeToByteArray(inputEncode).pubDecrypt(key, alg).encodeTo(outputEncode)
                 }
-            else data.decodeToByteArray(inputEncode).pubDecrypt(key, alg).encodeTo(outputEncode)
+            } else data.decodeToByteArray(inputEncode).pubDecrypt(key, alg).encodeTo(outputEncode)
         }
 }

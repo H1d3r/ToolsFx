@@ -29,7 +29,7 @@ object Base91 {
                     en -= 13
                 } else {
                     // 取14位
-                    ev = ebq and 16383
+                    ev = ebq and 16_383
                     // 右移 14位
                     ebq = ebq shr 14
                     en -= 14
@@ -69,7 +69,7 @@ object Base91 {
             }
         }
         if (dv != -1) {
-            output.write(((dbq or dv shl dn).toByte()).toInt())
+            output.write(((dbq or (dv shl dn)).toByte()).toInt())
         }
         return output.toByteArray()
     }

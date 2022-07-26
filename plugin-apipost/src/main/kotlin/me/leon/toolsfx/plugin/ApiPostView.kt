@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package me.leon.toolsfx.plugin
 
 import javafx.beans.property.SimpleBooleanProperty
@@ -7,6 +9,7 @@ import javafx.geometry.Pos
 import javafx.scene.control.*
 import javafx.scene.control.cell.CheckBoxTableCell
 import javafx.scene.text.Text
+import me.leon.*
 import me.leon.ext.*
 import me.leon.ext.fx.*
 import me.leon.toolsfx.plugin.ApiConfig.resortFromConfig
@@ -76,10 +79,10 @@ class ApiPostView : PluginFragment("ApiPost") {
     private val curlFileHandler = fileDraggedHandler {
         with(it.first()) {
             println(absolutePath)
-            if (length() <= 128 * 1024)
-                if (realExtension() in unsupportedExts) "unsupported file extension"
+            if (length() <= 128 * 1024) {
+                if (realExtension() in unsupportedExts) println("unsupported file extension")
                 else resetUi(readText())
-            else "not support file larger than 128KB"
+            } else println("not support file larger than 128KB")
         }
     }
     override val root = vbox {
@@ -98,8 +101,11 @@ class ApiPostView : PluginFragment("ApiPost") {
                     promptText = "input your url"
                     onDragEntered = curlFileHandler
                 }
-            button(graphic = imageview("/img/import.png")) { action { resetUi(clipboardText()) } }
-            button(graphic = imageview("/img/run.png")) {
+            button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
+                action { resetUi(clipboardText()) }
+            }
+            button(graphic = imageview(IMG_RUN)) {
                 enableWhen(!isRunning)
                 action {
                     if (tfUrl.text.isEmpty() ||
@@ -111,7 +117,7 @@ class ApiPostView : PluginFragment("ApiPost") {
                     isRunning.value = true
                     runAsync {
                         runCatching {
-                            if (selectedMethod.get() == "POST")
+                            if (selectedMethod.get() == "POST") {
                                 when (bodyTypeMap[selectedBodyType.get()]) {
                                     BodyType.JSON, BodyType.FORM_DATA ->
                                         uploadParams?.run {
@@ -129,11 +135,12 @@ class ApiPostView : PluginFragment("ApiPost") {
                                                 reqHeaders.apply {
                                                     if (selectedBodyType.get() ==
                                                             BodyType.FORM_DATA.type
-                                                    )
+                                                    ) {
                                                         put(
                                                             "Content-Type",
                                                             "application/x-www-form-urlencoded"
                                                         )
+                                                    }
                                                 },
                                                 bodyTypeMap[selectedBodyType.get()] == BodyType.JSON
                                             )
@@ -144,13 +151,14 @@ class ApiPostView : PluginFragment("ApiPost") {
                                             reqHeaders
                                         )
                                 }
-                            else
+                            } else {
                                 controller.request(
                                     tfUrl.text,
                                     selectedMethod.get(),
                                     reqTableParams as MutableMap<String, Any>,
                                     reqHeaders
                                 )
+                            }
                         }
                             .onSuccess {
                                 textRspStatus.text = it.statusInfo
@@ -173,7 +181,8 @@ class ApiPostView : PluginFragment("ApiPost") {
             button(graphic = imageview("/img/settings.png")) {
                 action { openInternalWindow<SettingsView>() }
             }
-            button(graphic = imageview("/img/copy.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
                 action {
                     Request(
                             tfUrl.text,
@@ -303,7 +312,10 @@ class ApiPostView : PluginFragment("ApiPost") {
             //            button("UnicodeDecode") {
             //                action { taRspContent.text = taRspContent.text.unicodeMix2String() }
             //            }
-            button(graphic = imageview("/img/copy.png")) { action { taRspContent.text.copy() } }
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { taRspContent.text.copy() }
+            }
 
             checkbox("prettify", isPretty)
         }

@@ -5,8 +5,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import me.leon.CHARSETS
-import me.leon.Styles
+import me.leon.*
 import me.leon.component.KeyIvInputView
 import me.leon.controller.SymmetricCryptoController
 import me.leon.ext.*
@@ -17,48 +16,13 @@ import tornadofx.FX.Companion.messages
 
 class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
     private val controller: SymmetricCryptoController by inject()
-    override val closeable = SimpleBooleanProperty(false)
-    private val isFile = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val isEnableIv = SimpleBooleanProperty(true)
-    private val isEnableAEAD = SimpleBooleanProperty(false)
-    private val isEnableModAndPadding = SimpleBooleanProperty(true)
-    private lateinit var taInput: TextArea
-    private lateinit var tgInput: ToggleGroup
-    private lateinit var tgOutput: ToggleGroup
+
     private var isEncrypt = true
-    private lateinit var taOutput: TextArea
-    private val inputText: String
-        get() = taInput.text
-    private val outputText: String
-        get() = taOutput.text
     private var timeConsumption = 0L
     private var startTime = 0L
-    private val info
-        get() =
-            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode:  ${isFile.get()} " +
-                "${messages["inputLength"]}: ${inputText.length}  " +
-                "${messages["outputLength"]}: ${outputText.length}  " +
-                "cost: $timeConsumption ms"
-    private lateinit var labelInfo: Label
-    private val keyIvInputView = KeyIvInputView(isEnableIv, isEnableAEAD)
     private var inputEncode = "raw"
     private var outputEncode = "base64"
     private val customAlg = arrayOf("XXTEA", "XOR")
-
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            if (isFile.get())
-                it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
-            else
-                with(it.first()) {
-                    if (length() <= 128 * 1024)
-                        if (realExtension() in unsupportedExts) "unsupported file extension"
-                        else readText()
-                    else "not support file larger than 128K,plz use file mode!!!"
-                }
-    }
     private val algs =
         mutableListOf(
             "DES",
@@ -106,10 +70,51 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
             "ISO10126d2Padding"
         )
     private val modes = mutableListOf("CBC", "ECB", "CFB", "OFB", "CTR", "GCM", "CCM", "EAX", "OCB")
+
+    override val closeable = SimpleBooleanProperty(false)
+    private val isFile = SimpleBooleanProperty(false)
+    private val isProcessing = SimpleBooleanProperty(false)
+    private val isSingleLine = SimpleBooleanProperty(false)
+    private val isEnableIv = SimpleBooleanProperty(true)
+    private val isEnableAEAD = SimpleBooleanProperty(false)
+    private val isEnableModAndPadding = SimpleBooleanProperty(true)
     private val selectedAlg = SimpleStringProperty(algs[2])
     private val selectedPadding = SimpleStringProperty(paddingsAlg.first())
     private val selectedCharset = SimpleStringProperty(CHARSETS.first())
     private val selectedMod = SimpleStringProperty(modes.first())
+
+    private var taInput: TextArea by singleAssign()
+    private var tgInput: ToggleGroup by singleAssign()
+    private var tgOutput: ToggleGroup by singleAssign()
+    private var taOutput: TextArea by singleAssign()
+    private var labelInfo: Label by singleAssign()
+    private val keyIvInputView = KeyIvInputView(isEnableIv, isEnableAEAD)
+
+    private val inputText: String
+        get() = taInput.text
+    private val outputText: String
+        get() = taOutput.text
+
+    private val info
+        get() =
+            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode:  ${isFile.get()} " +
+                "${messages["inputLength"]}: ${inputText.length}  " +
+                "${messages["outputLength"]}: ${outputText.length}  " +
+                "cost: $timeConsumption ms"
+
+    private val eventHandler = fileDraggedHandler {
+        taInput.text =
+            if (isFile.get()) {
+                it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
+            } else {
+                with(it.first()) {
+                    if (length() <= 128 * 1024) {
+                        if (realExtension() in unsupportedExts) "unsupported file extension"
+                        else readText()
+                    } else "not support file larger than 128K,plz use file mode!!!"
+                }
+            }
+    }
 
     private val cipher
         get() =
@@ -134,6 +139,7 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                 }
 
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
@@ -202,7 +208,7 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
             }
             checkbox(messages["fileMode"], isFile)
             checkbox(messages["singleLine"], isSingleLine)
-            button(messages["run"], imageview("/img/run.png")) {
+            button(messages["run"], imageview(IMG_RUN)) {
                 enableWhen(!isProcessing)
                 action { doCrypto() }
             }
@@ -222,8 +228,12 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                     }
                 }
 
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
-            button(graphic = imageview("/img/up.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
+            button(graphic = imageview(IMG_UP)) {
+                tooltip(messages["up"])
                 action {
                     taInput.text = outputText
                     taOutput.text = ""
@@ -249,10 +259,34 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
         runAsync {
             startTime = System.currentTimeMillis()
             isProcessing.value = true
-            if (isEncrypt)
-                if (isFile.get())
+            runCatching {
+                if (isEncrypt) {
+                    if (isFile.get()) {
+                        inputText.lineAction2String {
+                            controller.encryptByFile(
+                                keyIvInputView.keyByteArray,
+                                it,
+                                keyIvInputView.ivByteArray,
+                                cipher,
+                                keyIvInputView.associatedData
+                            )
+                        }
+                    } else {
+                        controller.encrypt(
+                            keyIvInputView.keyByteArray,
+                            inputText,
+                            keyIvInputView.ivByteArray,
+                            cipher,
+                            selectedCharset.get(),
+                            isSingleLine.get(),
+                            inputEncode,
+                            outputEncode,
+                            keyIvInputView.associatedData
+                        )
+                    }
+                } else if (isFile.get()) {
                     inputText.lineAction2String {
-                        controller.encryptByFile(
+                        controller.decryptByFile(
                             keyIvInputView.keyByteArray,
                             it,
                             keyIvInputView.ivByteArray,
@@ -260,8 +294,8 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                             keyIvInputView.associatedData
                         )
                     }
-                else
-                    controller.encrypt(
+                } else {
+                    controller.decrypt(
                         keyIvInputView.keyByteArray,
                         inputText,
                         keyIvInputView.ivByteArray,
@@ -272,29 +306,9 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                         outputEncode,
                         keyIvInputView.associatedData
                     )
-            else if (isFile.get())
-                inputText.lineAction2String {
-                    controller.decryptByFile(
-                        keyIvInputView.keyByteArray,
-                        it,
-                        keyIvInputView.ivByteArray,
-                        cipher,
-                        keyIvInputView.associatedData
-                    )
                 }
-            else {
-                controller.decrypt(
-                    keyIvInputView.keyByteArray,
-                    inputText,
-                    keyIvInputView.ivByteArray,
-                    cipher,
-                    selectedCharset.get(),
-                    isSingleLine.get(),
-                    inputEncode,
-                    outputEncode,
-                    keyIvInputView.associatedData
-                )
             }
+                .getOrElse { it.stacktrace() }
         } ui
             {
                 isProcessing.value = false

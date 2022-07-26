@@ -27,11 +27,7 @@ fun String.hexReverse2ByteArray() =
     stripAllSpace().chunked(2).map { it.reversed().toInt(HEX_RADIX).toByte() }.toByteArray()
 
 fun ByteArray.toBinaryString() =
-    joinToString("") {
-        with((it.toInt() and BYTE_MASK).toString(2)) {
-            this.takeIf { it.length == BYTE_BITS } ?: ("0".repeat(BYTE_BITS - this.length) + this)
-        }
-    }
+    joinToString("") { (it.toInt() and BYTE_MASK).toString(2).padStart(BYTE_BITS, '0') }
 
 /** 二进制编解码 */
 fun String.toBinaryString() = toByteArray().toBinaryString()
@@ -79,7 +75,7 @@ fun String.toJsOctalEncodeString() =
         .toString()
 
 fun String.unicode2String() =
-    if (contains("&#"))
+    if (contains("&#")) {
         "(?i)&#x([0-9a-f]+);|&#(\\d+);"
             .toRegex()
             .findAll(this)
@@ -89,11 +85,12 @@ fun String.unicode2String() =
             }
             .fold(StringBuilder()) { acc, (c, radix) -> acc.append(c.toInt(radix).toUnicodeChar()) }
             .toString()
-    else
+    } else {
         split("(?i)\\\\u\\+?".toRegex())
             .filterIndexed { index, _ -> index != 0 }
             .fold(StringBuilder()) { acc, c -> acc.append(c.toInt(HEX_RADIX).toChar()) }
             .toString()
+    }
 
 fun String.htmlEntity2String() =
     if (contains("&#")) {

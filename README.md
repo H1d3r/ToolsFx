@@ -39,8 +39,11 @@
 - [x] uuEncode
 - [x] xxEncode
 - [x] escape/escapeAll
+- [x] auto decode(crack)
 
 ![encode](./art/encode.gif)
+
+![one key decode](./art/one_key_decode.gif)
 
 **String Process(e.g. Split)**
 
@@ -58,12 +61,13 @@ support file, big file which is larger than 8Gi
 
 - [x] md serial
 - [x] sha1
-- [x] sha2 
+- [x] sha2
 - [x] sha3
 - [x] SM3
 - [x] RIPEMD
 - [x] whirlpool
 - [x] Tiger
+- [x] dictionary hash mapping(crack)
 - [x] etc.
 
 ![hash](./art/hash.gif)
@@ -188,7 +192,7 @@ support file, big file which is larger than 8Gi
 - [x] SM2
 - [ ] other
 
-### Classical Crypto (for CTF)
+### Classical Crypto (for CTF) 
 
 - [x] caesar
 - [x] rot5/rot13/rot18/rot47
@@ -205,7 +209,7 @@ support file, big file which is larger than 8Gi
 - [x] Auto Key
 - [x] rail-fence normal /rail-fence w-type
 - [x] playfair
-- [x] brainfuck/troll/ook
+- [x] brainfuck/troll/ook (decryption only)
 - [x] Braille
 - [x] alphabet index
 - [x] 01248
@@ -220,11 +224,14 @@ support file, big file which is larger than 8Gi
 - [x] Gray code
 - [x] Buddha Says(佛曰)
 - [x] Hill Cipher
-- [x] 新佛曰/兽曰/熊曰(online)
+- [x] 新佛曰/兽音/熊曰(online)
 - [x] rabbit
 - [x] aaencode/jjencode
+- [x] RSA crack (nec,pqec)
+- [x] etc.
 
 ![ctf](./art/ctf.gif)
+![rsa_nec](./art/rsa_nec.gif)
 
 ### PBE
 
@@ -235,6 +242,7 @@ support file, big file which is larger than 8Gi
 - [x] Qrcode/OCR
 - [x] String Process
 - [x] Big Integer Calculator
+- [x] ECC Calculator
 - [ ] TBD
 
 ### Features
@@ -261,13 +269,13 @@ download boost https://leon.lanzoui.com/b0d9av2kb code：52pj plugin download ht
 
 ## Version Choose
 
-- with jre environment
-    - jdk8 choose suffix with jdk8
-    - jdk11+ choose suffix with jdk11 & also need to config javafx environment
-- w/o jre environment(Windows user only)
-    - 64bit Windows x64 (jre11)
-    - 32/64bit Windows x86 (jre8,have no idea, choose this)
-- beta (jar file)
+- with jre environment (for developer)
+    - jdk8                         ----   choose suffix with jdk8-all-platform
+    - jdk11+                     ----   choose suffix with  jdk17-no-jfx-all-platform & also need to config javafx environment
+- w/o jre environment(Windows user only,normal user)
+    - 64bit Windows       ----   withjre-win-x64(latest LTS version)
+    - 32/64bit Windows  ----   jdk8-withjre-windows-x86  (if have no idea, choose this)
+- beta (jar file, for geeker)
   copy jar file to lib directory and delete ToolsFx-xxx.jar or app-xx.jar
 
 ## How to Run

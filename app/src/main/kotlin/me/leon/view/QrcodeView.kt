@@ -18,7 +18,7 @@ import javafx.scene.text.Text
 import javafx.stage.Stage
 import javafx.stage.StageStyle
 import kotlin.math.abs
-import me.leon.Styles
+import me.leon.*
 import me.leon.encode.base.base64
 import me.leon.ext.*
 import me.leon.ext.fx.*
@@ -26,32 +26,26 @@ import me.leon.ext.ocr.BaiduOcr
 import tornadofx.*
 
 class QrcodeView : Fragment("Qrcode") {
-    // 切图区域的起始位置x
     private var startX = 0.0
-
-    // 切图区域的起始位置y
     private var startY = 0.0
-
-    // 切图区域宽
     private var w = 0.0
-
-    // 切图区域高
     private var h = 0.0
+
+    private val errorLvs = listOf("L ~7%", "M ~15%", "Q ~25%", "H ~30%")
+    private var isOcr = false
+
+    private val selectedErrLv = SimpleStringProperty(errorLvs.first())
+    override val closeable = SimpleBooleanProperty(false)
 
     // 切图区域
     private lateinit var hBox: HBox
-    private lateinit var button: Button
-    private lateinit var ta: TextArea
-    private lateinit var textCount: Text
+    private var button: Button by singleAssign()
+    private var ta: TextArea by singleAssign()
+    private var textCount: Text by singleAssign()
 
     // 切成的图片展示区域
-    private lateinit var iv: ImageView
-    private var isOcr = false
+    private var iv: ImageView by singleAssign()
 
-    private val errorLvs = listOf("L ~7%", "M ~15%", "Q ~25%", "H ~30%")
-    private val selectedErrLv = SimpleStringProperty(errorLvs.first())
-
-    override val closeable = SimpleBooleanProperty(false)
     private val eventHandler = fileDraggedHandler {
         ta.text =
             runCatching { it.joinToString("\n") { "${it.name}:    ${it.qrReader()}" } }.getOrElse {
@@ -108,10 +102,14 @@ class QrcodeView : Fragment("Qrcode") {
         hbox {
             spacing = DEFAULT_SPACING_3X
             label(messages["content"])
-            button(graphic = imageview("/img/copy.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
                 action { ta.text.copy().also { if (it) primaryStage.showToast("复制成功") } }
             }
-            button(graphic = imageview("/img/import.png")) { action { ta.text = clipboardText() } }
+            button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
+                action { ta.text = clipboardText() }
+            }
         }
         vbox {
             alignment = Pos.CENTER_RIGHT
@@ -149,7 +147,8 @@ class QrcodeView : Fragment("Qrcode") {
         }
         hbox {
             label(messages["qrImg"])
-            button(graphic = imageview("/img/copy.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
                 action { iv.image?.copy()?.also { if (it) primaryStage.showToast("复制二维码成功") } }
             }
         }

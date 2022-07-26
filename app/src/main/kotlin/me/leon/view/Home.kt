@@ -21,7 +21,7 @@ import tornadofx.*
 import tornadofx.FX.Companion.messages
 
 class Home : View("${messages["appName"]} v$VERSION build $BUILD_DATE") {
-    private var views: MutableList<KClass<out Fragment>> = mutableListOf()
+    private val views: MutableList<KClass<out Fragment>> = mutableListOf()
 
     init {
         if (isEnableClassical) views.add(ClassicalView::class)
@@ -36,10 +36,11 @@ class Home : View("${messages["appName"]} v$VERSION build $BUILD_DATE") {
         if (isEnableSignature) views.add(SignatureView::class)
         if (isEnableQrcode) views.add(QrcodeView::class)
         if (isEnablePBE) views.add(PBEView::class)
-        if (isEnableInternalWebview)
+        if (isEnableInternalWebview) {
             runCatching { Class.forName("javafx.scene.web.WebView") }.onSuccess {
                 views.add(OnlineWebView::class)
             }
+        }
     }
 
     override val root = tabpane {
@@ -84,13 +85,14 @@ class Home : View("${messages["appName"]} v$VERSION build $BUILD_DATE") {
                 }
             }
 
-            item("open in new window") {
+            item(messages["newWindow"]) {
                 action {
                     with(this@tabpane.selectionModel.selectedIndex) {
                         if (this < views.size) find(views[this]).openWindow()
                     }
                 }
             }
+            item("GC") { action { System.gc() } }
         }
     }
 

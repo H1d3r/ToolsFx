@@ -4,6 +4,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
+import me.leon.*
 import me.leon.Styles
 import me.leon.controller.SignatureController
 import me.leon.encode.base.base64
@@ -15,39 +16,6 @@ import tornadofx.FX.Companion.messages
 
 class SignatureView : Fragment(messages["signVerify"]) {
     private val controller: SignatureController by inject()
-    override val closeable = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private lateinit var taKey: TextArea
-    private lateinit var taRaw: TextArea
-    private lateinit var labelInfo: Label
-    private lateinit var taSigned: TextArea
-    private val key: String
-        get() = taKey.text
-    private val msg: String
-        get() = taRaw.text
-    private val signText: String
-        get() = taSigned.text
-
-    private val eventHandler = fileDraggedHandler {
-        taKey.text =
-            with(it.first()) {
-                if (extension in listOf("pk8", "key", "der")) readBytes().base64()
-                else if (extension in listOf("cer", "crt")) parsePublicKeyFromCerFile()
-                else if (length() <= 10 * 1024 * 1024)
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                else "not support file larger than 10M"
-            }
-    }
-    private val inputEventHandler = fileDraggedHandler {
-        taRaw.text =
-            with(it.first()) {
-                if (length() <= 128 * 1024)
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                else "not support file larger than 128KB"
-            }
-    }
 
     // https://www.bouncycastle.org/specifications.html
     private val keyPairAlgs =
@@ -138,22 +106,58 @@ class SignatureView : Fragment(messages["signVerify"]) {
                     "SHA512withECNR"
                 )
         )
-
-    private val selectedKeyPairAlg = SimpleStringProperty(keyPairAlgs.keys.first())
-    private val selectedSigAlg = SimpleStringProperty(keyPairAlgs.values.first().first())
-    private lateinit var cbSigs: ComboBox<String>
     private var timeConsumption = 0L
     private var startTime = 0L
+    private var inputEncode = "raw"
+    private var outputEncode = "base64"
+
+    override val closeable = SimpleBooleanProperty(false)
+    private val isSingleLine = SimpleBooleanProperty(false)
+    private val selectedKeyPairAlg = SimpleStringProperty(keyPairAlgs.keys.first())
+    private val selectedSigAlg = SimpleStringProperty(keyPairAlgs.values.first().first())
+
+    private var taKey: TextArea by singleAssign()
+    private var taRaw: TextArea by singleAssign()
+    private var labelInfo: Label by singleAssign()
+    private var taSigned: TextArea by singleAssign()
+    private var tgInput: ToggleGroup by singleAssign()
+    private var tgOutput: ToggleGroup by singleAssign()
+    private var cbSigs: ComboBox<String> by singleAssign()
+    private val key: String
+        get() = taKey.text
+    private val msg: String
+        get() = taRaw.text
+    private val signText: String
+        get() = taSigned.text
+
+    private val eventHandler = fileDraggedHandler {
+        taKey.text =
+            with(it.first()) {
+                if (extension in listOf("pk8", "key", "der")) readBytes().base64()
+                else if (extension in listOf("cer", "crt")) parsePublicKeyFromCerFile()
+                else if (length() <= 10 * 1024 * 1024) {
+                    if (realExtension() in unsupportedExts) "unsupported file extension"
+                    else readText()
+                } else "not support file larger than 10M"
+            }
+    }
+    private val inputEventHandler = fileDraggedHandler {
+        taRaw.text =
+            with(it.first()) {
+                if (length() <= 128 * 1024) {
+                    if (realExtension() in unsupportedExts) "unsupported file extension"
+                    else readText()
+                } else "not support file larger than 128KB"
+            }
+    }
+
     private val info
         get() =
             "Signature: ${selectedKeyPairAlg.get()} hash: ${selectedSigAlg.get()} " +
                 "${messages["inputLength"]}: ${msg.length}  " +
                 "${messages["outputLength"]}: ${signText.length}  " +
                 "cost: $timeConsumption ms"
-    private var inputEncode = "raw"
-    private var outputEncode = "base64"
-    private lateinit var tgInput: ToggleGroup
-    private lateinit var tgOutput: ToggleGroup
+
     private val centerNode = vbox {
         addClass(Styles.group)
         hbox {
@@ -170,6 +174,7 @@ class SignatureView : Fragment(messages["signVerify"]) {
                 }
 
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taRaw.text = clipboardText() }
             }
         }
@@ -183,6 +188,7 @@ class SignatureView : Fragment(messages["signVerify"]) {
         hbox {
             label(messages["key"])
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taKey.text = clipboardText() }
             }
         }
@@ -246,7 +252,10 @@ class SignatureView : Fragment(messages["signVerify"]) {
                     }
                 }
 
-            button(graphic = imageview("/img/copy.png")) { action { signText.copy() } }
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { signText.copy() }
+            }
         }
 
         taSigned =
@@ -264,15 +273,18 @@ class SignatureView : Fragment(messages["signVerify"]) {
     private fun sign() =
         runAsync {
             startTime = System.currentTimeMillis()
-            controller.sign(
-                selectedKeyPairAlg.get(),
-                selectedSigAlg.get(),
-                key,
-                msg,
-                inputEncode,
-                outputEncode,
-                isSingleLine.get()
-            )
+            runCatching {
+                controller.sign(
+                    selectedKeyPairAlg.get(),
+                    selectedSigAlg.get(),
+                    key,
+                    msg,
+                    inputEncode,
+                    outputEncode,
+                    isSingleLine.get()
+                )
+            }
+                .getOrElse { it.stacktrace() }
         } ui
             {
                 taSigned.text = it
@@ -283,17 +295,20 @@ class SignatureView : Fragment(messages["signVerify"]) {
 
     private fun verify() =
         runAsync {
-            startTime = System.currentTimeMillis()
-            controller.verify(
-                selectedKeyPairAlg.get(),
-                selectedSigAlg.get(),
-                key,
-                msg,
-                inputEncode,
-                outputEncode,
-                signText,
-                isSingleLine.get()
-            )
+            runCatching {
+                startTime = System.currentTimeMillis()
+                controller.verify(
+                    selectedKeyPairAlg.get(),
+                    selectedSigAlg.get(),
+                    key,
+                    msg,
+                    inputEncode,
+                    outputEncode,
+                    signText,
+                    isSingleLine.get()
+                )
+            }
+                .getOrElse { it.stacktrace() }
         } ui
             { state ->
                 primaryStage.showToast("result: \n$state")

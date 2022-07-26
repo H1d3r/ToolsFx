@@ -14,9 +14,10 @@ import tornadofx.FX.Companion.messages
 class AboutView : Fragment(messages["about"]) {
 
     override val closeable = SimpleBooleanProperty(false)
+    private val isFetching = SimpleBooleanProperty(false)
+
     private var txtLatestVersion: Text by singleAssign()
     private lateinit var releaseInfo: ReleaseInfo
-    private val isFetching = SimpleBooleanProperty(false)
 
     override val root = vbox {
         alignment = Pos.CENTER
@@ -27,8 +28,12 @@ class AboutView : Fragment(messages["about"]) {
         text("Build: $BUILD_DATE")
         text("JRE: ${System.getProperty("java.runtime.version")}")
         text("VM: ${System.getProperty("java.vm.name")}")
-        hyperlink("feedback").action { REPO_ISSUE.openInBrowser() }
+
+        hyperlink("wiki").action { WIKI.openInBrowser() }
+        hyperlink("吾爱破解地址").action { PJ52_URL.openInBrowser() }
+        hyperlink(messages["feedback"]).action { REPO_ISSUE.openInBrowser() }
         hyperlink(messages["license"]).action { LICENSE.openInBrowser() }
+
         button(messages["checkUpdate"]) {
             enableWhen(!isFetching)
             action {
@@ -61,11 +66,11 @@ class AboutView : Fragment(messages["about"]) {
                 releaseInfo = it.fromJson(ReleaseInfo::class.java)
                 txtLatestVersion.text =
                     if (it.isEmpty()) messages["unknown"]
-                    else if (VERSION != releaseInfo.version)
+                    else if (VERSION != releaseInfo.version) {
                         "${messages["latestVer"]} v${releaseInfo.version}".also {
                             find<UpdateFragment>(mapOf("releaseInfo" to releaseInfo)).openModal()
                         }
-                    else messages["alreadyLatest"]
+                    } else messages["alreadyLatest"]
             }
     }
 
@@ -80,11 +85,11 @@ class AboutView : Fragment(messages["about"]) {
                 releaseInfo = it.fromJson(ReleaseInfo::class.java)
                 txtLatestVersion.text =
                     if (it.isEmpty()) messages["unknown"]
-                    else if (!VERSION.contains("beta") && VERSION != releaseInfo.version)
+                    else if (!VERSION.contains("beta") && VERSION != releaseInfo.version) {
                         "${messages["latestVer"]} v${releaseInfo.version}".also {
                             find<UpdateFragment>(mapOf("releaseInfo" to releaseInfo)).openModal()
                         }
-                    else messages["alreadyLatest"]
+                    } else messages["alreadyLatest"]
             }
     }
 }

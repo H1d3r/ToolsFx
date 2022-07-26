@@ -3,10 +3,8 @@ package me.leon.view
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import kotlin.system.measureTimeMillis
-import me.leon.Styles
+import me.leon.*
 import me.leon.controller.ClassicalController
-import me.leon.encode.base.base64
 import me.leon.ext.*
 import me.leon.ext.crypto.*
 import me.leon.ext.fx.*
@@ -15,18 +13,27 @@ import tornadofx.FX.Companion.messages
 
 class ClassicalView : Fragment(messages["classical"]) {
     private val controller: ClassicalController by inject()
+
+    private var timeConsumption = 0L
+    private var startTime = 0L
+    private var isEncrypt = true
+    private var encodeType = ClassicalCryptoType.CAESAR
+
     override val closeable = SimpleBooleanProperty(false)
     private val isSingleLine = SimpleBooleanProperty(false)
-    private val decodeIgnoreSpace = SimpleBooleanProperty(true)
-    private var encodeType = ClassicalCryptoType.CAESAR
+    private val decodeIgnoreSpace = SimpleBooleanProperty(encodeType.isIgnoreSpace())
     private val param1Enabled = SimpleBooleanProperty(encodeType.paramsCount() > 0)
     private val param2Enabled = SimpleBooleanProperty(encodeType.paramsCount() > 1)
-    private lateinit var taInput: TextArea
-    private lateinit var taOutput: TextArea
-    private lateinit var tfParam1: TextField
-    private lateinit var tfParam2: TextField
-    private lateinit var labelInfo: Label
-    private var timeConsumption = 0L
+    private val isProcessing = SimpleBooleanProperty(false)
+    private val hasCrack = SimpleBooleanProperty(encodeType.hasCrack())
+
+    private var taInput: TextArea by singleAssign()
+    private var taOutput: TextArea by singleAssign()
+    private var tfParam1: TextField by singleAssign()
+    private var tfParam2: TextField by singleAssign()
+    private var tfCrackKey: TextField by singleAssign()
+    private var labelInfo: Label by singleAssign()
+
     private val info: String
         get() =
             "${if (isEncrypt) messages["encode"] else messages["decode"]}: $encodeType  ${messages["inputLength"]}:" +
@@ -36,18 +43,16 @@ class ClassicalView : Fragment(messages["classical"]) {
     private val outputText: String
         get() = taOutput.text
 
-    private var isEncrypt = true
-
     private val cryptoParams
         get() = mapOf("p1" to tfParam1.text, "p2" to tfParam2.text)
 
     private val eventHandler = fileDraggedHandler {
         taInput.text =
             with(it.first()) {
-                if (length() <= 128 * 1024)
+                if (length() <= 128 * 1024) {
                     if (realExtension() in unsupportedExts) "unsupported file extension"
                     else readText()
-                else "not support file larger than 128KB"
+                } else "not support file larger than 128KB"
             }
     }
     private val centerNode = vbox {
@@ -55,41 +60,29 @@ class ClassicalView : Fragment(messages["classical"]) {
         hbox {
             spacing = DEFAULT_SPACING
             label(messages["input"])
+            addClass(Styles.left)
             button(graphic = imageview("/img/openwindow.png")) {
+                tooltip(messages["newWindow"])
                 action { find<ClassicalView>().openWindow() }
             }
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
+
+            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["decodeIgnoreSpace"], decodeIgnoreSpace)
         }
 
         taInput =
             textarea {
+                prefRowCount = TEXT_AREA_LINES
                 promptText = messages["inputHint"]
                 isWrapText = true
                 onDragEntered = eventHandler
+
                 contextmenu {
-                    item(messages["loadFromNet"]) {
-                        action { runAsync { inputText.readFromNet() } ui { taInput.text = it } }
-                    }
-                    item(messages["loadFromNetLoop"]) {
-                        action {
-                            runAsync { inputText.simpleReadFromNet() } ui { taInput.text = it }
-                        }
-                    }
-                    item(messages["loadFromNet2"]) {
-                        action {
-                            runAsync { inputText.readBytesFromNet().base64() } ui
-                                {
-                                    taInput.text = it
-                                }
-                        }
-                    }
-                    item(messages["readHeadersFromNet"]) {
-                        action {
-                            runAsync { inputText.readHeadersFromNet() } ui { taInput.text = it }
-                        }
-                    }
+                    item(messages["reverse"]) { action { taInput.text = inputText.reversed() } }
                 }
             }
         hbox {
@@ -108,6 +101,7 @@ class ClassicalView : Fragment(messages["classical"]) {
                     }
                     selectedToggleProperty().addListener { _, _, new ->
                         encodeType = new.cast<RadioButton>().text.classicalType()
+                        hasCrack.value = encodeType.hasCrack()
                         param1Enabled.set(encodeType.paramsCount() > 0)
                         param2Enabled.set(encodeType.paramsCount() > 1)
                         tfParam1.promptText = encodeType.paramsHints()[0]
@@ -144,25 +138,41 @@ class ClassicalView : Fragment(messages["classical"]) {
             spacing = DEFAULT_SPACING
             alignment = Pos.CENTER
             togglegroup {
-                spacing = DEFAULT_SPACING
-                alignment = Pos.CENTER
                 radiobutton(messages["encrypt"]) { isSelected = true }
                 radiobutton(messages["decrypt"])
-                checkbox(messages["decodeIgnoreSpace"], decodeIgnoreSpace)
-                checkbox(messages["singleLine"], isSingleLine)
                 selectedToggleProperty().addListener { _, _, new ->
                     isEncrypt = new.cast<RadioButton>().text == messages["encrypt"]
                     run()
                 }
             }
-            button(messages["run"], imageview("/img/run.png")) { action { run() } }
+            button(messages["run"], imageview(IMG_RUN)) {
+                action { run() }
+                enableWhen(!isProcessing)
+            }
             button(messages["codeFrequency"]) { action { "https://quipqiup.com/".openInBrowser() } }
+
+            button("wiki") { action { WIKI_CTF.openInBrowser() } }
+            button("crack", imageview("/img/crack.png")) {
+                enableWhen(!isProcessing)
+                visibleWhen(hasCrack)
+                action { crack() }
+            }
+            label("crack key:") { visibleWhen(hasCrack) }
+            tfCrackKey =
+                textfield("flag|ctf") {
+                    visibleWhen(hasCrack)
+                    prefWidth = DEFAULT_SPACING_8X
+                }
         }
         hbox {
             spacing = DEFAULT_SPACING
             label(messages["output"])
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
-            button(graphic = imageview("/img/up.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
+            button(graphic = imageview(IMG_UP)) {
+                tooltip(messages["up"])
                 action {
                     taInput.text = outputText
                     taOutput.text = ""
@@ -174,6 +184,7 @@ class ClassicalView : Fragment(messages["classical"]) {
             textarea {
                 promptText = messages["outputHint"]
                 isWrapText = true
+                prefRowCount = TEXT_AREA_LINES - 2
                 contextmenu {
                     item("uppercase") { action { taOutput.text = taOutput.text.uppercase() } }
                     item("lowercase") { action { taOutput.text = taOutput.text.lowercase() } }
@@ -197,22 +208,47 @@ class ClassicalView : Fragment(messages["classical"]) {
     }
 
     private fun run() {
-        measureTimeMillis {
-            taOutput.text =
-                if (isEncrypt)
-                    controller.encrypt(
-                        inputText,
-                        encodeType,
-                        cryptoParams,
-                        isSingleLine.get(),
-                    )
-                else controller.decrypt(inputText, encodeType, cryptoParams, isSingleLine.get())
-            if (Prefs.autoCopy)
-                outputText.copy().also { primaryStage.showToast(messages["copied"]) }
-            //            fire(SimpleMsgEvent(taOutput.text, 1))
-        }
-            .also {
-                timeConsumption = it
+        isProcessing.value = true
+        startTime = System.currentTimeMillis()
+        runAsync {
+            if (isEncrypt) {
+                controller.encrypt(
+                    inputText,
+                    encodeType,
+                    cryptoParams,
+                    isSingleLine.get(),
+                )
+            } else controller.decrypt(inputText, encodeType, cryptoParams, isSingleLine.get())
+        } ui
+            {
+                isProcessing.value = false
+                taOutput.text = it
+                if (Prefs.autoCopy) {
+                    outputText.copy().also { primaryStage.showToast(messages["copied"]) }
+                }
+                timeConsumption = System.currentTimeMillis() - startTime
+                labelInfo.text = info
+            }
+    }
+
+    private fun crack() {
+        isProcessing.value = true
+        startTime = System.currentTimeMillis()
+        runAsync {
+            controller.crack(
+                inputText,
+                encodeType,
+                tfCrackKey.text.takeUnless { it.isNullOrEmpty() } ?: "flag",
+                isSingleLine.get(),
+            )
+        } ui
+            {
+                isProcessing.value = false
+                taOutput.text = it
+                if (Prefs.autoCopy) {
+                    outputText.copy().also { primaryStage.showToast(messages["copied"]) }
+                }
+                timeConsumption = System.currentTimeMillis() - startTime
                 labelInfo.text = info
             }
     }

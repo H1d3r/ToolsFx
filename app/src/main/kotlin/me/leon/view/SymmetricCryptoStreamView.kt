@@ -5,8 +5,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import me.leon.CHARSETS
-import me.leon.Styles
+import me.leon.*
 import me.leon.component.KeyIvInputView
 import me.leon.controller.SymmetricCryptoController
 import me.leon.ext.*
@@ -16,45 +15,12 @@ import tornadofx.FX.Companion.messages
 
 class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
     private val controller: SymmetricCryptoController by inject()
-    override val closeable = SimpleBooleanProperty(false)
-    private val isFile = SimpleBooleanProperty(false)
-    private val isEnableIv = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
-    private lateinit var taInput: TextArea
-    private lateinit var tgInput: ToggleGroup
-    private lateinit var tgOutput: ToggleGroup
-    private var isEncrypt = true
-    private lateinit var taOutput: TextArea
-    private val inputText: String
-        get() = taInput.text
-    private val outputText: String
-        get() = taOutput.text
-    private var timeConsumption = 0L
-    private var startTime = 0L
-    private val info
-        get() =
-            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode: ${isFile.get()} " +
-                "${messages["inputLength"]}: ${inputText.length}  " +
-                "${messages["outputLength"]}: ${outputText.length}  " +
-                "cost: $timeConsumption ms"
-    private lateinit var infoLabel: Label
-    private val keyIvInputView = KeyIvInputView(isEnableIv)
+
     private var inputEncode = "raw"
     private var outputEncode = "base64"
-
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            if (isFile.get())
-                it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
-            else
-                with(it.first()) {
-                    if (length() <= 128 * 1024)
-                        if (realExtension() in unsupportedExts) "unsupported file extension"
-                        else readText()
-                    else "not support file larger than 128KB, plz use file mode!!!"
-                }
-    }
-
+    private var isEncrypt = true
+    private var timeConsumption = 0L
+    private var startTime = 0L
     private val algs =
         mutableListOf(
             "RC4", // aka ARC4
@@ -72,12 +38,51 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
             "Zuc-128",
             "Zuc-256",
         )
+
+    override val closeable = SimpleBooleanProperty(false)
+    private val isFile = SimpleBooleanProperty(false)
+    private val isEnableIv = SimpleBooleanProperty(false)
+    private val isProcessing = SimpleBooleanProperty(false)
     private val selectedAlg = SimpleStringProperty(algs.first())
+    private val selectedCharset = SimpleStringProperty(CHARSETS.first())
+    private val isSingleLine = SimpleBooleanProperty(false)
+
+    private lateinit var taInput: TextArea
+    private lateinit var tgInput: ToggleGroup
+    private lateinit var tgOutput: ToggleGroup
+    private lateinit var taOutput: TextArea
+    private lateinit var infoLabel: Label
+    private val keyIvInputView = KeyIvInputView(isEnableIv)
+
+    private val inputText: String
+        get() = taInput.text
+    private val outputText: String
+        get() = taOutput.text
+
+    private val info
+        get() =
+            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode: ${isFile.get()} " +
+                "${messages["inputLength"]}: ${inputText.length}  " +
+                "${messages["outputLength"]}: ${outputText.length}  " +
+                "cost: $timeConsumption ms"
+
+    private val eventHandler = fileDraggedHandler {
+        taInput.text =
+            if (isFile.get()) {
+                it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
+            } else {
+                with(it.first()) {
+                    if (length() <= 128 * 1024) {
+                        if (realExtension() in unsupportedExts) "unsupported file extension"
+                        else readText()
+                    } else "not support file larger than 128KB, plz use file mode!!!"
+                }
+            }
+    }
 
     private val cipher
         get() = selectedAlg.get()
-    private val selectedCharset = SimpleStringProperty(CHARSETS.first())
-    private val isSingleLine = SimpleBooleanProperty(false)
+
     private val centerNode = vbox {
         addClass(Styles.group)
         hbox {
@@ -94,6 +99,7 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
                 }
 
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
@@ -129,7 +135,7 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
             }
             checkbox(messages["fileMode"], isFile)
             checkbox(messages["singleLine"], isSingleLine)
-            button(messages["run"], imageview("/img/run.png")) {
+            button(messages["run"], imageview(IMG_RUN)) {
                 enableWhen(!isProcessing)
                 action { doCrypto() }
             }
@@ -147,8 +153,12 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
                         outputEncode = newValue.cast<RadioButton>().text
                     }
                 }
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
-            button(graphic = imageview("/img/up.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
+            button(graphic = imageview(IMG_UP)) {
+                tooltip(messages["up"])
                 action {
                     taInput.text = outputText
                     taOutput.text = ""
@@ -173,18 +183,40 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
         runAsync {
             isProcessing.value = true
             startTime = System.currentTimeMillis()
-            if (isEncrypt)
-                if (isFile.get())
+            runCatching {
+                if (isEncrypt) {
+                    if (isFile.get()) {
+                        inputText.lineAction2String {
+                            controller.encryptByFile(
+                                keyIvInputView.keyByteArray,
+                                it,
+                                keyIvInputView.ivByteArray,
+                                cipher
+                            )
+                        }
+                    } else {
+                        controller.encrypt(
+                            keyIvInputView.keyByteArray,
+                            inputText,
+                            keyIvInputView.ivByteArray,
+                            cipher,
+                            selectedCharset.get(),
+                            isSingleLine.get(),
+                            inputEncode,
+                            outputEncode
+                        )
+                    }
+                } else if (isFile.get()) {
                     inputText.lineAction2String {
-                        controller.encryptByFile(
+                        controller.decryptByFile(
                             keyIvInputView.keyByteArray,
                             it,
                             keyIvInputView.ivByteArray,
                             cipher
                         )
                     }
-                else
-                    controller.encrypt(
+                } else {
+                    controller.decrypt(
                         keyIvInputView.keyByteArray,
                         inputText,
                         keyIvInputView.ivByteArray,
@@ -194,26 +226,9 @@ class SymmetricCryptoStreamView : Fragment(messages["symmetricStream"]) {
                         inputEncode,
                         outputEncode
                     )
-            else if (isFile.get())
-                inputText.lineAction2String {
-                    controller.decryptByFile(
-                        keyIvInputView.keyByteArray,
-                        it,
-                        keyIvInputView.ivByteArray,
-                        cipher
-                    )
                 }
-            else
-                controller.decrypt(
-                    keyIvInputView.keyByteArray,
-                    inputText,
-                    keyIvInputView.ivByteArray,
-                    cipher,
-                    selectedCharset.get(),
-                    isSingleLine.get(),
-                    inputEncode,
-                    outputEncode
-                )
+            }
+                .getOrElse { it.stacktrace() }
         } ui
             {
                 isProcessing.value = false

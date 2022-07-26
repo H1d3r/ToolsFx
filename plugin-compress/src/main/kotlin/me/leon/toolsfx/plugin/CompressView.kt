@@ -4,7 +4,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import me.leon.CHARSETS
+import me.leon.*
 import me.leon.ext.*
 import me.leon.ext.fx.*
 import me.leon.toolsfx.plugin.compress.compressType
@@ -44,10 +44,10 @@ class CompressView : PluginFragment(messages["compression"]) {
     private val eventHandler = fileDraggedHandler {
         taInput.text =
             with(it.first()) {
-                if (length() <= 10 * 1024 * 1024)
+                if (length() <= 10 * 1024 * 1024) {
                     if (realExtension() in unsupportedExts) "unsupported file extension"
                     else readText()
-                else "not support file larger than 10M"
+                } else "not support file larger than 10M"
             }
     }
 
@@ -77,6 +77,7 @@ class CompressView : PluginFragment(messages["compression"]) {
                 }
 
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
@@ -126,7 +127,7 @@ class CompressView : PluginFragment(messages["compression"]) {
                 }
             }
             checkbox(messages["singleLine"], isSingleLine)
-            button(messages["run"], imageview("/img/run.png")) {
+            button(messages["run"], imageview(IMG_RUN)) {
                 enableWhen(!isProcessing)
                 action { doCrypto() }
             }
@@ -145,8 +146,12 @@ class CompressView : PluginFragment(messages["compression"]) {
                         outputEncode = newValue.cast<RadioButton>().text
                     }
                 }
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
-            button(graphic = imageview("/img/up.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
+            button(graphic = imageview(IMG_UP)) {
+                tooltip(messages["up"])
                 action {
                     taInput.text = outputText
                     taOutput.text = ""
@@ -170,7 +175,7 @@ class CompressView : PluginFragment(messages["compression"]) {
     private fun doCrypto() {
         runAsync {
             isProcessing.value = true
-            if (isCompress)
+            if (isCompress) {
                 controller.compress(
                     inputText,
                     cipher.compressType(),
@@ -178,7 +183,7 @@ class CompressView : PluginFragment(messages["compression"]) {
                     outputEncode,
                     isSingleLine.get(),
                 )
-            else
+            } else {
                 controller.decompress(
                     inputText,
                     cipher.compressType(),
@@ -186,6 +191,7 @@ class CompressView : PluginFragment(messages["compression"]) {
                     outputEncode,
                     isSingleLine.get(),
                 )
+            }
         } ui
             {
                 isProcessing.value = false

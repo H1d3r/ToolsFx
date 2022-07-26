@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package me.leon.toolsfx.plugin.net
 
 import java.io.DataOutputStream
@@ -20,7 +22,7 @@ object HttpUrlUtil {
     private var DEFAULT_PRE_ACTION: (Request) -> Unit = {}
     private var DEFAULT_POST_ACTION: (ByteArray) -> String = { it.decodeToString() }
     private var isDebug = false
-    var timeOut = 10000
+    var timeOut = 10_000
     private var proxy: Proxy = Proxy.NO_PROXY
     var downloadFolder = File(File("").absoluteFile, "downloads")
     private var preAction: (Request) -> Unit = DEFAULT_PRE_ACTION
@@ -29,6 +31,16 @@ object HttpUrlUtil {
     private const val PREFIX = "--"
     private const val LINE_END = "\r\n"
     private const val CONTENT_TYPE_FORM_DATA = "multipart/form-data"
+
+    val globalHeaders =
+        mutableMapOf(
+            "Accept" to "*/*",
+            "Connection" to "Keep-Alive",
+            "Content-Type" to "application/json; charset=utf-8",
+            "User-Agent" to
+                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)" +
+                    " Chrome/86.0.4240.198 Safari/537.36",
+        )
 
     fun setupProxy(type: Proxy.Type, host: String, port: Int) {
         proxy =
@@ -47,16 +59,6 @@ object HttpUrlUtil {
     fun addPostHandle(action: (ByteArray) -> String) {
         postAction = action
     }
-
-    val globalHeaders =
-        mutableMapOf(
-            "Accept" to "*/*",
-            "Connection" to "Keep-Alive",
-            "Content-Type" to "application/json; charset=utf-8",
-            "User-Agent" to
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)" +
-                    " Chrome/86.0.4240.198 Safari/537.36",
-        )
 
     fun get(
         url: String,
@@ -185,8 +187,9 @@ object HttpUrlUtil {
         val time = measureTimeMillis {
             conn.requestMethod = req.method
             for ((k, v) in header) conn.setRequestProperty(k, v.toString())
-            if (dataBytes.isNotEmpty())
+            if (dataBytes.isNotEmpty()) {
                 conn.addRequestProperty("Content-Length", dataBytes.size.toString())
+            }
             httpConfig(conn, data)
             conn.connect()
             conn.outputStream.write(dataBytes)
@@ -218,8 +221,9 @@ object HttpUrlUtil {
         val time = measureTimeMillis {
             conn.requestMethod = req.method
             for ((k, v) in header) conn.setRequestProperty(k, v.toString())
-            if (dataBytes.isNotEmpty())
+            if (dataBytes.isNotEmpty()) {
                 conn.addRequestProperty("Content-Length", dataBytes.size.toString())
+            }
             httpConfig(conn, data)
             conn.connect()
             conn.outputStream.write(dataBytes)
@@ -331,12 +335,13 @@ object HttpUrlUtil {
         }
         sb.appendLine()
             .also {
-                if (rsp.isNotEmpty())
+                if (rsp.isNotEmpty()) {
                     it.append("\t")
                         .append("body:")
                         .appendLine()
                         .append(rsp.split("\n").joinToString("\n") { "\t\t$it" })
                         .appendLine()
+                }
             }
             .append("<-- END HTTP")
         println(sb.toString())

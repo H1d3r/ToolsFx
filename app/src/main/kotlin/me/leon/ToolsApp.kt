@@ -1,9 +1,12 @@
 package me.leon
 
 import java.io.File
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.Locale
 import java.util.Properties
 import javafx.scene.image.Image
+import javax.net.ssl.*
 import me.leon.ext.fx.Prefs
 import me.leon.view.Home
 import tornadofx.*
@@ -15,15 +18,46 @@ class ToolsApp : App(Home::class, Styles::class) {
         FX.locale = if (Prefs.language == "zh") Locale.CHINESE else Locale.ENGLISH
         addStageIcon(Image(resources.stream("/img/tb.png")))
         initConfig()
+        fixSsl()
+    }
+
+    private fun fixSsl() {
+        val trustManagers =
+            arrayOf(
+                object : X509TrustManager {
+                    override fun checkClientTrusted(
+                        chain: Array<out X509Certificate>?,
+                        authType: String?
+                    ) {
+                        // nop
+                    }
+
+                    override fun checkServerTrusted(
+                        chain: Array<out X509Certificate>?,
+                        authType: String?
+                    ) {
+                        // nop
+                    }
+
+                    override fun getAcceptedIssuers(): Array<X509Certificate>? {
+                        return null
+                    }
+                }
+            )
+        val sc = SSLContext.getInstance("TLSv1.2")
+        sc.init(null, trustManagers, SecureRandom())
+        HttpsURLConnection.setDefaultSSLSocketFactory(sc.socketFactory)
+        HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
     }
 
     private fun initConfig() {
 
         var file = File(APP_ROOT, "ToolsFx.properties")
-        if (!file.exists())
+        if (!file.exists()) {
             javaClass.getResourceAsStream("/ToolsFx.properties")?.use {
                 it.copyTo(file.outputStream())
             }
+        }
         properties.load(file.inputStream())
         file = File(DICT_DIR, "top1000.txt")
 

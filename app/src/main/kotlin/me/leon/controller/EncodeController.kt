@@ -1,8 +1,10 @@
 package me.leon.controller
 
 import java.nio.charset.Charset
-import me.leon.ext.*
+import me.leon.DEBUG
+import me.leon.ext.catch
 import me.leon.ext.crypto.EncodeType
+import me.leon.ext.lineAction2String
 import tornadofx.*
 
 class EncodeController : Controller() {
@@ -14,11 +16,11 @@ class EncodeController : Controller() {
         charset: String = "UTF-8",
         isSingleLine: Boolean = false
     ) =
-        if (isSingleLine)
+        if (isSingleLine) {
             raw.lineAction2String {
-                encode2String(raw.toByteArray(Charset.forName(charset)), type, dic, charset)
+                encode2String(it.toByteArray(Charset.forName(charset)), type, dic, charset)
             }
-        else encode2String(raw.toByteArray(Charset.forName(charset)), type, dic, charset)
+        } else encode2String(raw.toByteArray(Charset.forName(charset)), type, dic, charset)
 
     fun encode2String(
         raw: ByteArray,
@@ -27,7 +29,7 @@ class EncodeController : Controller() {
         charset: String = "UTF-8"
     ): String =
         catch({ "编码错误: $it" }) {
-            println("encode2String $type $dic $charset")
+            if (DEBUG) println("encode2String $type $dic $charset")
             if (raw.isEmpty()) "" else type.encode2String(raw, dic, charset)
         }
 
@@ -38,11 +40,13 @@ class EncodeController : Controller() {
         charset: String = "UTF-8",
         isSingleLine: Boolean = false
     ) =
-        if (isSingleLine)
+        if (isSingleLine) {
             encoded.lineAction2String {
                 decode(it, type, dic, charset).toString(Charset.forName(charset))
             }
-        else decode(encoded, type, dic, charset).toString(Charset.forName(charset))
+        } else {
+            decode(encoded, type, dic, charset).toString(Charset.forName(charset))
+        }
 
     fun decode(
         encoded: String,
@@ -50,8 +54,8 @@ class EncodeController : Controller() {
         dic: String = "",
         charset: String = "UTF-8"
     ): ByteArray =
-        catch({ "解码错误: ${it.lineSplit().first()}".toByteArray() }) {
-            println("decode $type $dic $charset $encoded")
+        catch({ "解码错误: ${it.lines().first()}".toByteArray() }) {
+            if (DEBUG) println("decode $type $dic $charset ${encoded.length}")
             if (encoded.isEmpty()) byteArrayOf() else type.decode(encoded, dic, charset)
         }
 }

@@ -4,8 +4,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import me.leon.CHARSETS
-import me.leon.Styles
+import me.leon.*
 import me.leon.controller.PBEController
 import me.leon.encode.base.base64Decode
 import me.leon.ext.*
@@ -15,19 +14,29 @@ import tornadofx.*
 
 class PBEView : Fragment("PBE") {
     private val controller: PBEController by inject()
+
+    private var timeConsumption = 0L
+    private var startTime = 0L
+    private var isEncrypt = true
+    private val algs = PBE.PBE_CRYPTO.toList()
+    private var saltEncode = "hex"
+
     override val closeable = SimpleBooleanProperty(false)
     private val isSingleLine = SimpleBooleanProperty(false)
-
     private val isProcessing = SimpleBooleanProperty(false)
-    private lateinit var taInput: TextArea
-    private lateinit var tfPwd: TextField
-    private lateinit var tfIteration: TextField
-    private lateinit var tfKeyLength: TextField
-    private lateinit var tfSalt: TextField
-    private lateinit var tfSaltLength: TextField
-    private lateinit var tgGroup: ToggleGroup
-    private var isEncrypt = true
-    private lateinit var taOutput: TextArea
+    private val selectedAlg = SimpleStringProperty(algs.first())
+    private val selectedCharset = SimpleStringProperty(CHARSETS.first())
+
+    private var taInput: TextArea by singleAssign()
+    private var tfPwd: TextField by singleAssign()
+    private var tfIteration: TextField by singleAssign()
+    private var tfKeyLength: TextField by singleAssign()
+    private var tfSalt: TextField by singleAssign()
+    private var tfSaltLength: TextField by singleAssign()
+    private var tgGroup: ToggleGroup by singleAssign()
+    private var taOutput: TextArea by singleAssign()
+    private var infoLabel: Label by singleAssign()
+
     private val inputText: String
         get() = taInput.text
     private val outputText: String
@@ -36,28 +45,25 @@ class PBEView : Fragment("PBE") {
         get() = tfKeyLength.text.toInt()
     private val saltLength
         get() = tfSaltLength.text.toInt()
-    private var timeConsumption = 0L
-    private var startTime = 0L
+    private val cipher
+        get() = "PBEWith${selectedAlg.get()}"
     private val info
         get() =
             "PBE Cipher: $cipher   charset: ${selectedCharset.get()} " +
                 "${messages["inputLength"]}: ${inputText.length}  " +
                 "${messages["outputLength"]}: ${outputText.length}  " +
                 "cost: $timeConsumption ms"
-    private lateinit var infoLabel: Label
-
-    private var saltEncode = "hex"
 
     private var saltByteArray
         get() =
-            if (tfSalt.text.isEmpty() && isEncrypt)
+            if (tfSalt.text.isEmpty() && isEncrypt) {
                 controller.getSalt(saltLength).also {
                     tfSalt.text = it.toHex()
                     tgGroup.selectToggle(
                         tgGroup.toggles.first { it.cast<RadioButton>().text == "hex" }
                     )
                 }
-            else tfSalt.text.decodeToByteArray(saltEncode)
+            } else tfSalt.text.decodeToByteArray(saltEncode)
         set(value) {
             tfSalt.text = value.encodeTo(saltEncode)
         }
@@ -65,26 +71,19 @@ class PBEView : Fragment("PBE") {
     private val eventHandler = fileDraggedHandler {
         taInput.text =
             with(it.first()) {
-                if (length() <= 128 * 1024)
+                if (length() <= 128 * 1024) {
                     if (realExtension() in unsupportedExts) "unsupported file extension"
                     else readText()
-                else "not support file larger than 128KB"
+                } else "not support file larger than 128KB"
             }
     }
-
-    private val algs = PBE.PBE_CRYPTO.toList()
-
-    private val selectedAlg = SimpleStringProperty(algs.first())
-
-    private val cipher
-        get() = "PBEWith${selectedAlg.get()}"
-    private val selectedCharset = SimpleStringProperty(CHARSETS.first())
 
     private val centerNode = vbox {
         addClass(Styles.group)
         hbox {
             label(messages["input"])
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
@@ -113,6 +112,9 @@ class PBEView : Fragment("PBE") {
                     prefWidth = DEFAULT_SPACING_8X
                     textFormatter = intTextFormatter
                 }
+        }
+        hbox {
+            addClass(Styles.left)
             label(messages["saltLen"])
             tfSaltLength =
                 textfield("8") {
@@ -154,10 +156,10 @@ class PBEView : Fragment("PBE") {
             }
 
             checkbox(messages["singleLine"], isSingleLine)
-            button("generate salt", imageview("/img/run.png")) {
+            button("generate salt", imageview(IMG_RUN)) {
                 action { controller.getSalt(saltLength).also { saltByteArray = it } }
             }
-            button(messages["run"], imageview("/img/run.png")) {
+            button(messages["run"], imageview(IMG_RUN)) {
                 enableWhen(!isProcessing)
                 action { doCrypto() }
             }
@@ -165,8 +167,12 @@ class PBEView : Fragment("PBE") {
         hbox {
             label(messages["output"])
             spacing = DEFAULT_SPACING
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
-            button(graphic = imageview("/img/up.png")) {
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
+            button(graphic = imageview(IMG_UP)) {
+                tooltip(messages["up"])
                 action {
                     taInput.text = outputText
                     taOutput.text = ""
@@ -190,7 +196,7 @@ class PBEView : Fragment("PBE") {
             if (taInput.text.isEmpty()) return@runAsync ""
             isProcessing.value = true
             runCatching {
-                if (isEncrypt)
+                if (isEncrypt) {
                     controller.encrypt(
                         tfPwd.text,
                         inputText,
@@ -200,8 +206,7 @@ class PBEView : Fragment("PBE") {
                         keyLength,
                         isSingleLine.get()
                     )
-                else {
-
+                } else {
                     saltByteArray = inputText.base64Decode().sliceArray(8 until (8 + saltLength))
                     controller.decrypt(
                         tfPwd.text,
@@ -220,8 +225,9 @@ class PBEView : Fragment("PBE") {
                 isProcessing.value = false
                 taOutput.text =
                     it.also {
-                        if (it.startsWith("U2FsdGVk"))
+                        if (it.startsWith("U2FsdGVk")) {
                             saltByteArray = it.base64Decode().sliceArray(8 until (8 + saltLength))
+                        }
                     }
                 timeConsumption = System.currentTimeMillis() - startTime
                 infoLabel.text = info

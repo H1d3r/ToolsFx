@@ -4,8 +4,7 @@ import java.io.File
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.scene.control.*
-import me.leon.ALGOS_HASH
-import me.leon.Styles
+import me.leon.*
 import me.leon.controller.DigestController
 import me.leon.encode.base.base64
 import me.leon.encode.base.base64Decode
@@ -16,15 +15,26 @@ import tornadofx.FX.Companion.messages
 
 class DigestView : Fragment(messages["hash"]) {
     private val controller: DigestController by inject()
+
+    private var timeConsumption = 0L
+    private var startTime = 0L
+    private var inputEncode = "raw"
+    private var method = "MD5"
+
     override val closeable = SimpleBooleanProperty(false)
     private val isFileMode = SimpleBooleanProperty(false)
     private val isProcessing = SimpleBooleanProperty(false)
     private val isSingleLine = SimpleBooleanProperty(false)
     private val isEnableFileMode = SimpleBooleanProperty(true)
-    private lateinit var taInput: TextArea
-    private lateinit var labelInfo: Label
-    lateinit var taOutput: TextArea
-    private lateinit var tfCount: TextField
+    private val selectedAlgItem = SimpleStringProperty(ALGOS_HASH.keys.first())
+    private val selectedBits = SimpleStringProperty(ALGOS_HASH.values.first().first())
+
+    private var taInput: TextArea by singleAssign()
+    private var labelInfo: Label by singleAssign()
+    private var taOutput: TextArea by singleAssign()
+    private var tfCount: TextField by singleAssign()
+    private var cbBits: ComboBox<String> by singleAssign()
+
     private var inputText: String
         get() = taInput.text
         set(value) {
@@ -39,24 +49,20 @@ class DigestView : Fragment(messages["hash"]) {
     private val times
         get() = tfCount.text.toIntOrNull() ?: 1.also { tfCount.text = "1" }
 
-    var method = "MD5"
-
     private val eventHandler = fileDraggedHandler {
         inputText =
-            if (isFileMode.get())
+            if (isFileMode.get()) {
                 it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
-            else
+            } else {
                 with(it.first()) {
-                    if (length() <= 10 * 1024 * 1024)
+                    if (length() <= 10 * 1024 * 1024) {
                         if (realExtension() in unsupportedExts) "unsupported file extension"
                         else readText()
-                    else "not support file larger than 10M"
+                    } else "not support file larger than 10M"
                 }
+            }
     }
 
-    private val selectedAlgItem = SimpleStringProperty(ALGOS_HASH.keys.first())
-    private val selectedBits = SimpleStringProperty(ALGOS_HASH.values.first().first())
-    lateinit var cbBits: ComboBox<String>
     private val info
         get() =
             "Hash: $method bits: ${selectedBits.get()} " +
@@ -64,10 +70,6 @@ class DigestView : Fragment(messages["hash"]) {
                 "${messages["outputLength"]}: ${outputText.length}  " +
                 "count: $times cost: $timeConsumption ms  " +
                 "file mode: ${isFileMode.get()}"
-
-    private var timeConsumption = 0L
-    private var startTime = 0L
-    private var inputEncode = "raw"
 
     private val centerNode = vbox {
         addClass(Styles.group)
@@ -85,6 +87,7 @@ class DigestView : Fragment(messages["hash"]) {
             }
 
             button(graphic = imageview("/img/import.png")) {
+                tooltip(messages["pasteFromClipboard"])
                 action { inputText = clipboardText() }
             }
         }
@@ -152,7 +155,7 @@ class DigestView : Fragment(messages["hash"]) {
                     prefWidth = DEFAULT_SPACING_8X
                     enableWhen(!isFileMode)
                 }
-            button(messages["run"], imageview("/img/run.png")) {
+            button(messages["run"], imageview(IMG_RUN)) {
                 enableWhen(!isProcessing)
                 action { doHash() }
             }
@@ -169,7 +172,10 @@ class DigestView : Fragment(messages["hash"]) {
         }
         hbox {
             label(messages["output"])
-            button(graphic = imageview("/img/copy.png")) { action { outputText.copy() } }
+            button(graphic = imageview(IMG_COPY)) {
+                tooltip(messages["copy"])
+                action { outputText.copy() }
+            }
         }
         taOutput =
             textarea {
@@ -186,29 +192,36 @@ class DigestView : Fragment(messages["hash"]) {
             }
     }
 
+    override val root = borderpane {
+        center = centerNode
+        bottom = hbox { labelInfo = label(info) }
+    }
+
     private fun crack() {
         runAsync {
             isProcessing.value = true
             startTime = System.currentTimeMillis()
-            val target =
-                inputText
-                    .decodeToByteArray(inputEncode.takeUnless { it == "raw" } ?: "hex")
-                    .encodeTo("hex")
-            controller.crack(method, target)
+            if (method.startsWith("SpringSecurity")) {
+                controller.passwordHashingCrack(method, inputText)
+            } else {
+                controller.crack(
+                    method,
+                    inputText
+                        .decodeToByteArray(inputEncode.takeUnless { it == "raw" } ?: "hex")
+                        .encodeTo("hex")
+                )
+            }
         } ui
             {
                 isProcessing.value = false
                 outputText = it
                 timeConsumption = System.currentTimeMillis() - startTime
                 labelInfo.text = info
-                if (Prefs.autoCopy)
+                if (Prefs.autoCopy) {
                     outputText.copy().also { primaryStage.showToast(messages["copied"]) }
+                }
+                System.gc()
             }
-    }
-
-    override val root = borderpane {
-        center = centerNode
-        bottom = hbox { labelInfo = label(info) }
     }
 
     private fun doHash() =
@@ -229,7 +242,8 @@ class DigestView : Fragment(messages["hash"]) {
                 outputText = it
                 timeConsumption = System.currentTimeMillis() - startTime
                 labelInfo.text = info
-                if (Prefs.autoCopy)
+                if (Prefs.autoCopy) {
                     outputText.copy().also { primaryStage.showToast(messages["copied"]) }
+                }
             }
 }
