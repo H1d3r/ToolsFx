@@ -1,7 +1,9 @@
 package me.leon.ctf.rsa
 
 import java.math.BigInteger
+import kotlin.math.ln
 import me.leon.*
+import me.leon.ext.findParallel
 
 object RsaSolver {
 
@@ -22,6 +24,9 @@ object RsaSolver {
     private val modeDp = listOf("dp", "e", "c", "n")
     private val modeBroadcastN3C3 = listOf("n1", "c1", "n2", "c2", "n3", "c3")
 
+    /** 字母数字 {} -_ */
+    val FLAG_REG = "CTF".toRegex()
+
     /**
      * 1. dp泄露
      * 2. e = 1
@@ -33,9 +38,9 @@ object RsaSolver {
     fun solve(params: MutableMap<String, BigInteger>): String =
         when {
             params.containKeys(modeNECPhi) ->
-                params["c"]!!.decrypt(params["e"]!!.invert(params["phi"]!!), params["n"]!!).also {
-                    println("solve N E C Phi ")
-                }
+                params["c"]!!
+                    .decrypt2String(params["e"]!!.invert(params["phi"]!!), params["n"]!!)
+                    .also { println("solve N E C Phi ") }
             params.containKeys(modeBroadcastN3C3) -> solveBroadCast(params)
             params.containKeys(modeDp) && params["dq"] == null -> dpLeak(params)
             params.containKeys(modeN2EC) ->
@@ -70,10 +75,33 @@ object RsaSolver {
         val e = requireNotNull(params["e"])
         val c = requireNotNull(params["c"])
         val factors =
-            params.keys.filter { it.startsWith("r") || it == "p" || it == "q" }.map { params[it]!! }
-        val n = params["n"] ?: factors.product()
+            params.keys
+                .filter { it.startsWith("r") || it == "p" || it == "q" }
+                .map { params[it]!! }
+                .filter { it.isProbablePrime(100) }
+        val n = factors.product()
         val phi = factors.phi()
-        return c.decrypt(e.invert(phi), n)
+        val gcd = e.gcd(phi)
+
+        return if (gcd == BigInteger.ONE) {
+            println("e phi are co-prime $phi")
+            val d = e.invert(phi)
+            c.decrypt2String(d, n).also { println(it) }
+        } else {
+            println("e phi are not are co-prime  $gcd")
+            val d = (e / gcd).invert(phi)
+            val m = c.modPow(d, n)
+            var result = ""
+            for (i in 0..1_000_000) {
+                val root = (m + n * i.toBigInteger()).root(gcd.toInt())
+                if (root.last() == BigInteger.ZERO) {
+                    result = root.first().n2s()
+                    println("times $i ${root.first()} $result")
+                    break
+                }
+            }
+            result
+        }
     }
 
     private fun solveNCD(params: MutableMap<String, BigInteger>): String {
@@ -81,20 +109,20 @@ object RsaSolver {
         val n = requireNotNull(params["n"])
         val d = requireNotNull(params["d"])
         val c = requireNotNull(params["c"])
-        return c.decrypt(d, n)
+        return c.decrypt2String(d, n)
     }
 
     private fun solveBroadCast(params: MutableMap<String, BigInteger>): String {
         println("solve broadcast")
         val modular =
-            params.keys.filter { it.startsWith("n") }.fold(BigInteger.ONE) { acc, s ->
-                acc * params[s]!!
-            }
+            params.keys
+                .filter { it.startsWith("n") }
+                .fold(BigInteger.ONE) { acc, s -> acc * params[s]!! }
         val e = params.keys.count { it.startsWith("n") }
         val divides =
-            params.keys.filter { it.startsWith("n") }.map {
-                DivideResult(params["c" + it.substring(1)]!!, params[it]!!)
-            }
+            params.keys
+                .filter { it.startsWith("n") }
+                .map { DivideResult(params["c" + it.substring(1)]!!, params[it]!!) }
         val me = crt(divides)
         val cx = me % modular
 
@@ -122,8 +150,9 @@ object RsaSolver {
         val d2 = e.invert(p.phi(q2))
         val c = c2.modPow(d2, n2)
         val d1 = e.invert(p.phi(q1))
-        val decrypt = c.decrypt(d1, n1)
-        return REG_NON_PRINTABLE.find(decrypt)?.run { c1.decrypt(d1, n1) } ?: run { decrypt }
+        val decrypt = c.decrypt2String(d1, n1)
+        val matches = REG_NUMBER.matches(decrypt)
+        return if (matches) c1.decrypt2String(d1, n1) else decrypt
     }
 
     private fun solveNE2C2(params: MutableMap<String, BigInteger>): String {
@@ -158,16 +187,23 @@ object RsaSolver {
             n.isProbablePrime(100) -> {
                 println("nec n is prime")
                 val phi = n - BigInteger.ONE
-                c.modPow(e.invert(phi), n).n2s()
+                if (e.gcd(phi) == e) {
+                    ammAlg(c, e, n)
+                        .firstOrNull { it.n2s().contains(REG_NON_PRINTABLE).not() }
+                        ?.n2s()
+                        .orEmpty()
+                } else {
+                    c.modPow(e.invert(phi), n).n2s()
+                }
             }
             e < 6.toBigInteger() -> smallE(n, c, e)
             e.bitLength() > 100 ->
                 with(e.wiener(n)) {
                     println("wiener attack")
-                    if (isEmpty()) "wiener failed" else c.decrypt(this.first(), n)
+                    if (this == null) "wiener failed" else c.decrypt2String(this, n)
                 }
             n.gcd(c) != BigInteger.ONE -> {
-                println("n c are not coprime")
+                println("n c are not co-prime")
                 val p = n.gcd(c)
                 val q = n / p
                 val phi = p.phi(q)
@@ -182,26 +218,25 @@ object RsaSolver {
                         val phi = it.first().eulerPhi(it.size)
                         val d = e.invert(phi).also { println(it) }
                         val propN = it.propN(n)
-                        c.decrypt(d, propN).also { println(it) }
+                        c.decrypt2String(d, propN).also { println(it) }
                     } else if (it.size >= 2) {
                         println(it)
                         val phi = it.phi()
                         val gcd = e.gcd(phi)
 
                         if (gcd == BigInteger.ONE) {
-                            println("e phi are coprime $phi")
+                            println("e phi are co-prime $phi")
                             val d = e.invert(phi).also { println(it) }
                             val propN = it.propN(n)
-                            c.decrypt(d, propN).also { println(it) }
+                            c.decrypt2String(d, propN).also { println(it) }
                         } else {
-                            println("e phi are not are coprime  $gcd")
+                            println("e phi are not are co-prime  $gcd")
                             val d = (e / gcd).invert(phi).also { println(it) }
                             val m = c.modPow(d, n)
                             var result = ""
-                            for (i in 1..1_000_000) {
+                            for (i in 0..1_000_000) {
                                 val root = (m + n * i.toBigInteger()).root(gcd.toInt())
                                 if (root.last() == BigInteger.ZERO) {
-                                    println(i)
                                     result = root.first().n2s()
                                     println("times $i ${root.first()} $result")
                                     break
@@ -209,10 +244,62 @@ object RsaSolver {
                             }
                             result
                         }
-                    } else "no solution"
+                    } else {
+                        "no solution"
+                    }
                 }
             }
         }
+    }
+
+    /** ported from https://www.anquanke.com/post/id/262634 */
+    fun ammAlg(x: BigInteger, e: BigInteger, p: BigInteger): MutableSet<BigInteger> {
+        var y = (p - BigInteger.ONE).random()
+
+        while (y.modPow((p - BigInteger.ONE) / e, p) == BigInteger.ONE) {
+            y = (p - BigInteger.ONE).random()
+        }
+        // p-1 = e^t*s
+        var t = 1
+        while (p % e == BigInteger.ZERO) {
+            t++
+        }
+        val s = p / e.pow(t)
+        var k = BigInteger.ONE
+        while ((s * k + BigInteger.ONE) % e != BigInteger.ZERO) {
+            k += BigInteger.ONE
+        }
+
+        val alpha = (s * k + BigInteger.ONE) / e
+        val bigInteger = e.pow(t - 1) * s
+        val a = y.modPow(bigInteger, p)
+        var b = x.modPow(e * alpha - BigInteger.ONE, p)
+        var c = y.modPow(s, p)
+        var h = BigInteger.ONE
+
+        for (i in 1 until t) {
+            val d = b.modPow(e.pow(t - 1 - i), p)
+            val j =
+                if (d == BigInteger.ONE) {
+                    BigInteger.ZERO
+                } else {
+                    (-ln(d.toDouble()) / ln(a.toDouble())).toBigDecimal().toBigInteger()
+                }
+            b *= (c.modPow(e, p)).modPow(j, p)
+            h *= c.modPow(j, p)
+            c = c.modPow(e, p)
+        }
+
+        val root = x.modPow(alpha * h, p) % p
+        val roots = mutableSetOf<BigInteger>()
+        for (i in 1..e.toInt()) {
+            val mp2 = root * a.modPow(i.toBigInteger(), p) % p
+            if (mp2.modPow(e, p) == x) {
+                roots.add(mp2)
+            }
+        }
+
+        return roots
     }
 
     private fun smallE(n: BigInteger, c: BigInteger, e: BigInteger): String {
@@ -242,7 +329,7 @@ object RsaSolver {
                 break
             }
         }
-        return c.decrypt(e.invert(p.phi(q)), n)
+        return c.decrypt2String(e.invert(p.phi(q)), n)
     }
 
     private fun solveDpDq(params: MutableMap<String, BigInteger>): String {
@@ -262,7 +349,7 @@ object RsaSolver {
         return m.n2s()
     }
 
-    /** 知p,q, 即只知 n d e phi互素判断 */
+    /** 知p,q, 即知 n d e phi互素判断 */
     fun solvePQEC(params: MutableMap<String, BigInteger>): String {
         val p = requireNotNull(params["p"])
         val q = params["q"] ?: (params["n"]!! / p)
@@ -276,15 +363,42 @@ object RsaSolver {
         val n = p * q
         val phi = p.phi(q)
         return if (e.gcd(phi) == BigInteger.ONE) {
-            println("solve P Q E C e phi are coprime")
+            println("solve P Q E C e phi are co-prime")
             val d = e.invert(p.phi(q))
-            c.decrypt(d, p * q)
+            c.decrypt2String(d, p * q)
         } else {
             val t = e.gcd(phi)
-            println("solve P Q E C e phi not are coprime!! $t")
             val t1 = e / t
-            val dt1 = t1.invert(phi)
-            c.modPow(dt1, n).root(t.toInt()).first().n2s()
+            println("solve P Q E C e phi not are co-prime!! $t $t1")
+            if (t1 == BigInteger.ONE) {
+                val mps = ammAlg(c % p, e, p)
+                val mqs = ammAlg(c % q, e, q)
+                val modulusList = listOf(p, q)
+                var qq: BigInteger? = null
+                val r =
+                    mps.findParallel(BigInteger.ZERO) { mpp ->
+                        mqs.find { mqq ->
+                                crt(listOf(mpp, mqq), modulusList)
+                                    .n2s()
+                                    .contains(REG_NON_PRINTABLE)
+                                    .not()
+                            }
+                            .also {
+                                if (it != null) {
+                                    qq = it
+                                    println(
+                                        "got $mpp \n$qq\n${crt(listOf(mpp, it), modulusList).n2s()}\n\n"
+                                    )
+                                    return@findParallel true
+                                }
+                            }
+                        false
+                    }
+                crt(listOf(r!!, qq!!), modulusList).n2s()
+            } else {
+                val dt1 = t1.invert(phi)
+                c.modPow(dt1, n).root(t.toInt()).first().n2s()
+            }
         }
     }
 }

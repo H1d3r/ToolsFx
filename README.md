@@ -3,7 +3,9 @@
 <h1 align="center">ToolsFx</h1>
 <p align="center">
 <a href="https://github.com/Leon406/ToolsFx/releases/latest"><img src="https://img.shields.io/github/release/Leon406/ToolsFx.svg"/></a>
-<a href="https://github.com/Leon406/ToolsFx/actions/workflows/detekt-analysis.yml/badge.svg"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/detekt-analysis.yml/badge.svg"/></a><img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
+<a href="https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml/badge.svg"/></a>
+<a href="https://github.com/Leon406/ToolsFx/actions/workflows/detekt.yml"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/detekt.yml/badge.svg"/></a>
+<img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
 <a href="changelog.md"><img src="https://img.shields.io/badge/updates-%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97-brightgreen"/></a>
 <img src="https://img.shields.io/badge/license-ISC-green"/>
 <img src="https://img.shields.io/github/downloads/Leon406/Toolsfx/total"/>
@@ -209,7 +211,7 @@ support file, big file which is larger than 8Gi
 - [x] Auto Key
 - [x] rail-fence normal /rail-fence w-type
 - [x] playfair
-- [x] brainfuck/troll/ook (decryption only)
+- [x] brainfuck/troll/ook
 - [x] Braille
 - [x] alphabet index
 - [x] 01248
@@ -277,6 +279,7 @@ download boost https://leon.lanzoui.com/b0d9av2kb code：52pj plugin download ht
     - 32/64bit Windows  ----   jdk8-withjre-windows-x86  (if have no idea, choose this)
 - beta (jar file, for geeker)
   copy jar file to lib directory and delete ToolsFx-xxx.jar or app-xx.jar
+- [github action nightly(same as beta,build when code change)](https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml)
 
 ## How to Run
 
@@ -288,16 +291,17 @@ download boost https://leon.lanzoui.com/b0d9av2kb code：52pj plugin download ht
 When Application is running ,it will generate ToolsFx.properties automatically , just modify the value. Below are the
 details.
 
-| key                     | value                                             |
-| ----------------------- | ------------------------------------------------- |
-| isEnableClassical       | Classical module switch,default is false          |
-| isEnablePBE             | PBE module switch,default is false                |
-| isEnableSignature       | Signature module switch,default is  true          |
-| isEnableMac             | MAC module switch,default is  true                |
-| isEnableSymmetricStream | Symmetric( Stream) module switch,default is  true |
-| isEnableQrcode          | Qrcode module switch,default is  true             |
-| isEnableInternalWebview | Internal Browser switch,default is false          |
-| extUrls                 | Internal Browser favourite urls, spit with comma  |
+| key                     | value                                                      |
+| ----------------------- |------------------------------------------------------------|
+| isEnableClassical       | Classical module switch,default is false                   |
+| isEnablePBE             | PBE module switch,default is false                         |
+| isEnableSignature       | Signature module switch,default is  true                   |
+| isEnableMac             | MAC module switch,default is  true                         |
+| isEnableSymmetricStream | Symmetric( Stream) module switch,default is  true          |
+| isEnableQrcode          | Qrcode module switch,default is  true                      |
+| isEnableInternalWebview | Internal Browser switch,default is false                   |
+| offlineMode             | offline mode, hide online functions,default is false |
+| extUrls                 | Internal Browser favourite urls, spit with comma           |
 
 ## [PLUGIN](README-plugin.md)
 

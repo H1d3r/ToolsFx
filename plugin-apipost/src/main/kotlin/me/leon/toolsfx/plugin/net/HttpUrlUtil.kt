@@ -5,8 +5,11 @@ package me.leon.toolsfx.plugin.net
 import java.io.DataOutputStream
 import java.io.File
 import java.net.*
+import java.security.cert.X509Certificate
 import java.util.UUID
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
@@ -19,11 +22,13 @@ object HttpUrlUtil {
         clazz.getDeclaredField("delegate").apply { isAccessible = true }
     }
 
-    private var DEFAULT_PRE_ACTION: (Request) -> Unit = {}
-    private var DEFAULT_POST_ACTION: (ByteArray) -> String = { it.decodeToString() }
-    private var isDebug = false
+    private val DEFAULT_PRE_ACTION: (Request) -> Unit = {}
+    private val DEFAULT_POST_ACTION: (ByteArray) -> String = { it.decodeToString() }
+    private val isDebug = false
     var timeOut = 10_000
     private var proxy: Proxy = Proxy.NO_PROXY
+    var followRedirect: Boolean = false
+    var verifyCert: Boolean = true
     var downloadFolder = File(File("").absoluteFile, "downloads")
     private var preAction: (Request) -> Unit = DEFAULT_PRE_ACTION
     private var postAction: (ByteArray) -> String = DEFAULT_POST_ACTION
@@ -31,6 +36,27 @@ object HttpUrlUtil {
     private const val PREFIX = "--"
     private const val LINE_END = "\r\n"
     private const val CONTENT_TYPE_FORM_DATA = "multipart/form-data"
+
+    private val ALL_TRUST_MANAGER =
+        object : X509TrustManager {
+            override fun checkClientTrusted(
+                paramArrayOfX509Certificate: Array<X509Certificate?>?,
+                paramString: String?
+            ) {
+                // nop
+            }
+
+            override fun checkServerTrusted(
+                paramArrayOfX509Certificate: Array<X509Certificate?>?,
+                paramString: String?
+            ) {
+                // nop
+            }
+
+            override fun getAcceptedIssuers(): Array<X509Certificate>? {
+                return null
+            }
+        }
 
     val globalHeaders =
         mutableMapOf(
@@ -44,8 +70,11 @@ object HttpUrlUtil {
 
     fun setupProxy(type: Proxy.Type, host: String, port: Int) {
         proxy =
-            if (type == Proxy.Type.DIRECT) Proxy.NO_PROXY
-            else Proxy(type, InetSocketAddress(host, port))
+            if (type == Proxy.Type.DIRECT) {
+                Proxy.NO_PROXY
+            } else {
+                Proxy(type, InetSocketAddress(host, port))
+            }
     }
 
     fun setupProxy(proxy: Proxy = Proxy.NO_PROXY) {
@@ -58,6 +87,13 @@ object HttpUrlUtil {
 
     fun addPostHandle(action: (ByteArray) -> String) {
         postAction = action
+    }
+
+    fun verifySSL(enable: Boolean = true) {
+        val sc = SSLContext.getInstance("TLS")
+        HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
+        sc.init(null, if (enable) arrayOf() else arrayOf(ALL_TRUST_MANAGER), null)
+        HttpsURLConnection.setDefaultSSLSocketFactory(sc.socketFactory)
     }
 
     fun get(
@@ -99,7 +135,7 @@ object HttpUrlUtil {
 
     private fun httpConfig(conn: HttpURLConnection, info: String = "") {
         conn.doOutput = true
-        conn.instanceFollowRedirects = true
+        conn.instanceFollowRedirects = followRedirect
         conn.readTimeout = timeOut
         conn.connectTimeout = timeOut
         showRequestInfo(conn, info)
@@ -123,14 +159,19 @@ object HttpUrlUtil {
     ): Response {
         val req = Request(url, method, params, headers)
         preAction(req)
+        val paramConcatChar = "&".takeIf { url.contains("?") } ?: "?"
         val realUrl =
-            req.url.takeIf { req.params.isEmpty() } ?: "${req.url}?${req.params.toParams()}"
+            req.url.takeIf { req.params.isEmpty() }
+                ?: "${req.url}$paramConcatChar${req.params.toParams()}"
         val conn = URL(realUrl).openConnection(proxy) as HttpURLConnection
         var rsp: String
         val header = makeHeaders(req.headers)
         val time = measureTimeMillis {
-            if (method == "PATCH" || method == "CONNECT") patchConnection(conn, method)
-            else conn.requestMethod = req.method
+            if (method == "PATCH" || method == "CONNECT") {
+                patchConnection(conn, method)
+            } else {
+                conn.requestMethod = req.method
+            }
             for ((k, v) in header) conn.setRequestProperty(k, v.toString())
             httpConfig(conn)
             conn.connect()
@@ -330,9 +371,9 @@ object HttpUrlUtil {
             .append(conn.url.toString())
             .append(" (${time}ms)")
             .appendLine()
-        conn.headerFields.filter { it.key != null }.forEach { (t, u) ->
-            sb.append("\t$t: ${u.joinToString(";")}").appendLine()
-        }
+        conn.headerFields
+            .filter { it.key != null }
+            .forEach { (t, u) -> sb.append("\t$t: ${u.joinToString(";")}").appendLine() }
         sb.appendLine()
             .also {
                 if (rsp.isNotEmpty()) {

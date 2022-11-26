@@ -27,8 +27,8 @@ class MacView : Fragment("MAC") {
     override val closeable = SimpleBooleanProperty(false)
     private val enableIv = SimpleBooleanProperty(false)
     private val enableBits = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val selectedAlgItem = SimpleStringProperty(algorithm.keys.first())
+    private val singleLine = SimpleBooleanProperty(false)
+    private val selectedAlg = SimpleStringProperty(algorithm.keys.first())
     private val selectedBits = SimpleStringProperty(algorithm.values.first().first())
 
     private var taInput: TextArea by singleAssign()
@@ -48,15 +48,7 @@ class MacView : Fragment("MAC") {
             taOutput.text = value
         }
 
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 10 * 1024 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 10M"
-            }
-    }
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
 
     private val info
         get() =
@@ -70,31 +62,29 @@ class MacView : Fragment("MAC") {
         hbox {
             label(messages["input"])
             addClass(Styles.left)
-            tgInput =
-                togglegroup {
-                    radiobutton("raw") { isSelected = true }
-                    radiobutton("base64")
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        inputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgInput = togglegroup {
+                radiobutton("raw") { isSelected = true }
+                radiobutton("base64")
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    inputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview("/img/import.png")) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
-            }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
+        }
         hbox {
             addClass(Styles.left)
             label(messages["alg"])
-            combobox(selectedAlgItem, algorithm.keys.toMutableList())
+            combobox(selectedAlg, algorithm.keys.toMutableList())
             label(messages["bits"]) { paddingAll = DEFAULT_SPACING }
             cbBits =
                 combobox(selectedBits, algorithm.values.first()) {
@@ -103,7 +93,7 @@ class MacView : Fragment("MAC") {
                 }
         }
         add(keyIvInputView)
-        selectedAlgItem.addListener { _, _, newValue ->
+        selectedAlg.addListener { _, _, newValue ->
             newValue?.run {
                 cbBits.items = algorithm[newValue]!!.asObservable()
                 selectedBits.set(algorithm[newValue]!!.first())
@@ -111,19 +101,16 @@ class MacView : Fragment("MAC") {
                 enableIv.value = method.contains("POLY1305|-GMAC|ZUC".toRegex())
             }
         }
-        selectedBits.addListener { _, _, newValue ->
-            println("selectedBits __ $newValue")
-            newValue?.run {
+        selectedBits.addListener { _, _, new ->
+            println("selectedBits __ $new")
+            new?.run {
                 method =
-                    if (selectedAlgItem.get() == "GMAC") "$newValue-GMAC"
-                    else if (selectedAlgItem.get().contains("ZUC-256")) {
-                        "${selectedAlgItem.get()}-$newValue"
+                    if (selectedAlg.get() == "GMAC") {
+                        "$new-GMAC"
+                    } else if (selectedAlg.get().contains("ZUC-256")) {
+                        "${selectedAlg.get()}-$new"
                     } else {
-                        "${selectedAlgItem.get()}${
-                            newValue.takeIf {
-                                algorithm[selectedAlgItem.get()]!!.size > 1
-                            } ?: ""
-                        }"
+                        "${selectedAlg.get()}${new.takeIf { algorithm[selectedAlg.get()]!!.size > 1 }.orEmpty()}"
                             .replace("SHA2(?!=\\d{3})".toRegex(), "SHA")
                             .replace(regAlgReplace, "$1-")
                     }
@@ -137,12 +124,13 @@ class MacView : Fragment("MAC") {
         tilepane {
             alignment = Pos.TOP_LEFT
             hgap = DEFAULT_SPACING
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             button(messages["run"], imageview(IMG_RUN)) {
                 setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
                 action {
-                    if (inputText.isNotEmpty()) doMac()
-                    else {
+                    if (inputText.isNotEmpty()) {
+                        doMac()
+                    } else {
                         outputText = ""
                     }
                 }
@@ -152,24 +140,22 @@ class MacView : Fragment("MAC") {
         hbox {
             label(messages["output"])
             addClass(Styles.left)
-            tgOutput =
-                togglegroup {
-                    radiobutton("hex") { isSelected = true }
-                    radiobutton("base64")
-                    selectedToggleProperty().addListener { _, _, new ->
-                        outputEncode = new.cast<RadioButton>().text
-                    }
+            tgOutput = togglegroup {
+                radiobutton("hex") { isSelected = true }
+                radiobutton("base64")
+                selectedToggleProperty().addListener { _, _, new ->
+                    outputEncode = new.cast<RadioButton>().text
                 }
+            }
             button(graphic = imageview(IMG_COPY)) {
                 tooltip(messages["copy"])
                 action { outputText.copy() }
             }
         }
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
 
     override val root = borderpane {
@@ -182,27 +168,27 @@ class MacView : Fragment("MAC") {
             startTime = System.currentTimeMillis()
 
             runCatching {
-                if (method.contains("POLY1305|-GMAC|ZUC".toRegex())) {
-                    controller.macWithIv(
-                        inputText,
-                        keyIvInputView.keyByteArray,
-                        keyIvInputView.ivByteArray,
-                        method,
-                        inputEncode,
-                        outputEncode,
-                        isSingleLine.get()
-                    )
-                } else {
-                    controller.mac(
-                        inputText,
-                        keyIvInputView.keyByteArray,
-                        method,
-                        inputEncode,
-                        outputEncode,
-                        isSingleLine.get()
-                    )
+                    if (method.contains("POLY1305|-GMAC|ZUC".toRegex())) {
+                        controller.macWithIv(
+                            inputText,
+                            keyIvInputView.keyByteArray,
+                            keyIvInputView.ivByteArray,
+                            method,
+                            inputEncode,
+                            outputEncode,
+                            singleLine.get()
+                        )
+                    } else {
+                        controller.mac(
+                            inputText,
+                            keyIvInputView.keyByteArray,
+                            method,
+                            inputEncode,
+                            outputEncode,
+                            singleLine.get()
+                        )
+                    }
                 }
-            }
                 .getOrElse { it.stacktrace() }
         } ui
             {

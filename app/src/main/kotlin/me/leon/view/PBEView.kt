@@ -22,8 +22,8 @@ class PBEView : Fragment("PBE") {
     private var saltEncode = "hex"
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
+    private val processing = SimpleBooleanProperty(false)
     private val selectedAlg = SimpleStringProperty(algs.first())
     private val selectedCharset = SimpleStringProperty(CHARSETS.first())
 
@@ -63,20 +63,14 @@ class PBEView : Fragment("PBE") {
                         tgGroup.toggles.first { it.cast<RadioButton>().text == "hex" }
                     )
                 }
-            } else tfSalt.text.decodeToByteArray(saltEncode)
+            } else {
+                tfSalt.text.decodeToByteArray(saltEncode)
+            }
         set(value) {
             tfSalt.text = value.encodeTo(saltEncode)
         }
 
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 128 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 128KB"
-            }
-    }
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
 
     private val centerNode = vbox {
         addClass(Styles.group)
@@ -87,12 +81,11 @@ class PBEView : Fragment("PBE") {
                 action { taInput.text = clipboardText() }
             }
         }
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
-            }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
+        }
         hbox {
             addClass(Styles.left)
             label(messages["alg"])
@@ -131,15 +124,14 @@ class PBEView : Fragment("PBE") {
             tfSalt = textfield { promptText = "optional,可空" }
             vbox {
                 addClass(Styles.group)
-                tgGroup =
-                    togglegroup {
-                        radiobutton("hex") { isSelected = true }
-                        radiobutton("base64")
-                        radiobutton("raw")
-                        selectedToggleProperty().addListener { _, _, new ->
-                            saltEncode = new.cast<RadioButton>().text
-                        }
+                tgGroup = togglegroup {
+                    radiobutton("hex") { isSelected = true }
+                    radiobutton("base64")
+                    radiobutton("raw")
+                    selectedToggleProperty().addListener { _, _, new ->
+                        saltEncode = new.cast<RadioButton>().text
                     }
+                }
             }
         }
         hbox {
@@ -155,12 +147,12 @@ class PBEView : Fragment("PBE") {
                 }
             }
 
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             button("generate salt", imageview(IMG_RUN)) {
                 action { controller.getSalt(saltLength).also { saltByteArray = it } }
             }
             button(messages["run"], imageview(IMG_RUN)) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 action { doCrypto() }
             }
         }
@@ -179,11 +171,10 @@ class PBEView : Fragment("PBE") {
                 }
             }
         }
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
     override val root = borderpane {
         center = centerNode
@@ -194,35 +185,36 @@ class PBEView : Fragment("PBE") {
         runAsync {
             startTime = System.currentTimeMillis()
             if (taInput.text.isEmpty()) return@runAsync ""
-            isProcessing.value = true
+            processing.value = true
             runCatching {
-                if (isEncrypt) {
-                    controller.encrypt(
-                        tfPwd.text,
-                        inputText,
-                        saltByteArray,
-                        cipher,
-                        tfIteration.text.toInt(),
-                        keyLength,
-                        isSingleLine.get()
-                    )
-                } else {
-                    saltByteArray = inputText.base64Decode().sliceArray(8 until (8 + saltLength))
-                    controller.decrypt(
-                        tfPwd.text,
-                        inputText,
-                        saltLength,
-                        cipher,
-                        tfIteration.text.toInt(),
-                        keyLength,
-                        isSingleLine.get()
-                    )
+                    if (isEncrypt) {
+                        controller.encrypt(
+                            tfPwd.text,
+                            inputText,
+                            saltByteArray,
+                            cipher,
+                            tfIteration.text.toInt(),
+                            keyLength,
+                            singleLine.get()
+                        )
+                    } else {
+                        saltByteArray =
+                            inputText.base64Decode().sliceArray(8 until (8 + saltLength))
+                        controller.decrypt(
+                            tfPwd.text,
+                            inputText,
+                            saltLength,
+                            cipher,
+                            tfIteration.text.toInt(),
+                            keyLength,
+                            singleLine.get()
+                        )
+                    }
                 }
-            }
                 .getOrElse { it.stacktrace() }
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text =
                     it.also {
                         if (it.startsWith("U2FsdGVk")) {

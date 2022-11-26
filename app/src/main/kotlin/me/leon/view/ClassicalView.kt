@@ -20,17 +20,21 @@ class ClassicalView : Fragment(messages["classical"]) {
     private var encodeType = ClassicalCryptoType.CAESAR
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
     private val decodeIgnoreSpace = SimpleBooleanProperty(encodeType.isIgnoreSpace())
     private val param1Enabled = SimpleBooleanProperty(encodeType.paramsCount() > 0)
     private val param2Enabled = SimpleBooleanProperty(encodeType.paramsCount() > 1)
-    private val isProcessing = SimpleBooleanProperty(false)
+    private val checkbox1Hidden = SimpleBooleanProperty(encodeType.checkboxHintsCount() == 0)
+    private val checkbox2Hidden = SimpleBooleanProperty(encodeType.checkboxHintsCount() < 2)
+    private val processing = SimpleBooleanProperty(false)
     private val hasCrack = SimpleBooleanProperty(encodeType.hasCrack())
 
     private var taInput: TextArea by singleAssign()
     private var taOutput: TextArea by singleAssign()
     private var tfParam1: TextField by singleAssign()
     private var tfParam2: TextField by singleAssign()
+    private var cb1: CheckBox by singleAssign()
+    private var cb2: CheckBox by singleAssign()
     private var tfCrackKey: TextField by singleAssign()
     private var labelInfo: Label by singleAssign()
 
@@ -44,17 +48,15 @@ class ClassicalView : Fragment(messages["classical"]) {
         get() = taOutput.text
 
     private val cryptoParams
-        get() = mapOf("p1" to tfParam1.text, "p2" to tfParam2.text)
+        get() =
+            mapOf(
+                P1 to tfParam1.text,
+                P2 to tfParam2.text,
+                C1 to cb1.isSelected.toString(),
+                C2 to cb2.isSelected.toString()
+            )
 
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 128 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 128KB"
-            }
-    }
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
     private val centerNode = vbox {
         addClass(Styles.group)
         hbox {
@@ -69,22 +71,24 @@ class ClassicalView : Fragment(messages["classical"]) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
+            button(graphic = imageview("/img/more.png")) {
+                action { find<CtfImageEncoderFragment>().openWindow() }
+            }
 
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             checkbox(messages["decodeIgnoreSpace"], decodeIgnoreSpace)
         }
 
-        taInput =
-            textarea {
-                prefRowCount = TEXT_AREA_LINES
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
+        taInput = textarea {
+            prefRowCount = TEXT_AREA_LINES
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
 
-                contextmenu {
-                    item(messages["reverse"]) { action { taInput.text = inputText.reversed() } }
-                }
+            contextmenu {
+                item(messages["reverse"]) { action { taInput.text = inputText.reversed() } }
             }
+        }
         hbox {
             addClass(Styles.left)
             label("${messages["encrypt"]}:")
@@ -93,23 +97,38 @@ class ClassicalView : Fragment(messages["classical"]) {
                 alignment = Pos.TOP_LEFT
                 prefColumns = 7
                 togglegroup {
-                    classicalTypeMap.forEach {
-                        radiobutton(it.key) {
-                            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
-                            if (it.value == ClassicalCryptoType.CAESAR) isSelected = true
+                    classicalTypeMap
+                        .filter { if (ToolsApp.offlineMode) !it.key.contains("online") else true }
+                        .forEach {
+                            radiobutton(it.key) {
+                                setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
+                                if (it.value == ClassicalCryptoType.CAESAR) isSelected = true
+                            }
                         }
-                    }
                     selectedToggleProperty().addListener { _, _, new ->
                         encodeType = new.cast<RadioButton>().text.classicalType()
                         hasCrack.value = encodeType.hasCrack()
                         param1Enabled.set(encodeType.paramsCount() > 0)
                         param2Enabled.set(encodeType.paramsCount() > 1)
-                        tfParam1.promptText = encodeType.paramsHints()[0]
-                        tfParam2.promptText = encodeType.paramsHints()[1]
+                        checkbox1Hidden.set(encodeType.checkboxHintsCount() == 0)
+                        checkbox2Hidden.set(encodeType.checkboxHintsCount() < 2)
+                        if (param1Enabled.get()) {
+                            tfParam1.promptText = encodeType.paramsHints()[0]
+                        }
+                        if (param2Enabled.get()) {
+                            tfParam2.promptText = encodeType.paramsHints()[1]
+                        }
+                        if (!checkbox1Hidden.get()) {
+                            cb1.text = encodeType.checkboxHints()[0]
+                        }
+                        if (!checkbox2Hidden.get()) {
+                            cb2.text = encodeType.checkboxHints()[1]
+                        }
                         decodeIgnoreSpace.set(encodeType.isIgnoreSpace())
 
-                        if (isEncrypt) run()
-                        else {
+                        if (isEncrypt) {
+                            run()
+                        } else {
                             timeConsumption = 0
                             labelInfo.text = info
                         }
@@ -120,18 +139,29 @@ class ClassicalView : Fragment(messages["classical"]) {
         hbox {
             spacing = DEFAULT_SPACING
             alignment = Pos.BASELINE_CENTER
-            tfParam1 =
-                textfield {
-                    prefWidth = DEFAULT_SPACING_40X
-                    promptText = encodeType.paramsHints()[0]
-                    visibleWhen(param1Enabled)
+
+            cb1 =
+                checkbox(
+                    if (encodeType.checkboxHintsCount() > 0) encodeType.checkboxHints()[0] else ""
+                ) {
+                    removeWhen(checkbox1Hidden)
                 }
-            tfParam2 =
-                textfield {
-                    prefWidth = DEFAULT_SPACING_40X
-                    promptText = encodeType.paramsHints()[1]
-                    visibleWhen(param2Enabled)
+            cb2 =
+                checkbox(
+                    if (encodeType.checkboxHintsCount() > 1) encodeType.checkboxHints()[1] else ""
+                ) {
+                    removeWhen(checkbox2Hidden)
                 }
+            tfParam1 = textfield {
+                prefWidth = DEFAULT_SPACING_40X
+                promptText = encodeType.paramsHints()[0]
+                visibleWhen(param1Enabled)
+            }
+            tfParam2 = textfield {
+                prefWidth = DEFAULT_SPACING_40X
+                promptText = encodeType.paramsHints()[1]
+                visibleWhen(param2Enabled)
+            }
         }
 
         hbox {
@@ -147,13 +177,13 @@ class ClassicalView : Fragment(messages["classical"]) {
             }
             button(messages["run"], imageview(IMG_RUN)) {
                 action { run() }
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
             }
             button(messages["codeFrequency"]) { action { "https://quipqiup.com/".openInBrowser() } }
 
             button("wiki") { action { WIKI_CTF.openInBrowser() } }
             button("crack", imageview("/img/crack.png")) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 visibleWhen(hasCrack)
                 action { crack() }
             }
@@ -180,26 +210,28 @@ class ClassicalView : Fragment(messages["classical"]) {
             }
         }
 
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-                prefRowCount = TEXT_AREA_LINES - 2
-                contextmenu {
-                    item("uppercase") { action { taOutput.text = taOutput.text.uppercase() } }
-                    item("lowercase") { action { taOutput.text = taOutput.text.lowercase() } }
-                    item("reverse") {
-                        action {
-                            taOutput.text =
-                                taOutput.text.split("\r\n|\n".toRegex()).joinToString("\r\n") {
-                                    it.reversed()
-                                }
-                        }
-                    }
-
-                    item("clear") { action { taOutput.text = "" } }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+            prefRowCount = TEXT_AREA_LINES - 2
+            contextmenu {
+                item("uppercase") { action { taOutput.text = taOutput.text.uppercase() } }
+                item("lowercase") { action { taOutput.text = taOutput.text.lowercase() } }
+                item("binary2hex") {
+                    action { taOutput.text = taOutput.text.binary2ByteArray().toHex() }
                 }
+                item("reverse") {
+                    action {
+                        taOutput.text =
+                            taOutput.text.split("\r\n|\n".toRegex()).joinToString("\r\n") {
+                                it.reversed()
+                            }
+                    }
+                }
+
+                item("clear") { action { taOutput.text = "" } }
             }
+        }
     }
 
     override val root = borderpane {
@@ -208,7 +240,7 @@ class ClassicalView : Fragment(messages["classical"]) {
     }
 
     private fun run() {
-        isProcessing.value = true
+        processing.value = true
         startTime = System.currentTimeMillis()
         runAsync {
             if (isEncrypt) {
@@ -216,12 +248,14 @@ class ClassicalView : Fragment(messages["classical"]) {
                     inputText,
                     encodeType,
                     cryptoParams,
-                    isSingleLine.get(),
+                    singleLine.get(),
                 )
-            } else controller.decrypt(inputText, encodeType, cryptoParams, isSingleLine.get())
+            } else {
+                controller.decrypt(inputText, encodeType, cryptoParams, singleLine.get())
+            }
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text = it
                 if (Prefs.autoCopy) {
                     outputText.copy().also { primaryStage.showToast(messages["copied"]) }
@@ -232,18 +266,18 @@ class ClassicalView : Fragment(messages["classical"]) {
     }
 
     private fun crack() {
-        isProcessing.value = true
+        processing.value = true
         startTime = System.currentTimeMillis()
         runAsync {
             controller.crack(
                 inputText,
                 encodeType,
                 tfCrackKey.text.takeUnless { it.isNullOrEmpty() } ?: "flag",
-                isSingleLine.get(),
+                singleLine.get(),
             )
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text = it
                 if (Prefs.autoCopy) {
                     outputText.copy().also { primaryStage.showToast(messages["copied"]) }

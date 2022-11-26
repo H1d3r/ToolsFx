@@ -18,32 +18,44 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
 
     private var timeConsumption = 0L
     private var startTime = 0L
-    private var encodeType = EncodeType.Base64
+    private var encodeType = EncodeType.BASE64
     private var isEncode = true
     private val excludeEncode =
         arrayOf(
-            EncodeType.Radix8,
-            EncodeType.Base16,
-            EncodeType.Octal,
+            EncodeType.RADIX8,
+            EncodeType.BASE16,
+            EncodeType.OCTAL,
             //            EncodeType.Decimal,
-            EncodeType.Radix10,
-            EncodeType.Radix32,
-            EncodeType.Radix64,
+            EncodeType.RADIX9,
+            EncodeType.RADIX_N,
+            EncodeType.RADIX10,
+            EncodeType.RADIX32,
+            EncodeType.RADIX64,
+            EncodeType.UTF7,
+            EncodeType.UTF7_ALL,
+            EncodeType.UTF7_EXT,
+            EncodeType.BASE69,
+            EncodeType.BASE65536,
+            EncodeType.ECOJI,
+            EncodeType.BASE2048,
+            EncodeType.BASE32768,
         )
     private val encodeTypeWithSpace =
         arrayOf(
-            EncodeType.UuEncode,
-            EncodeType.XxEncode,
-            EncodeType.QuotePrintable,
-            EncodeType.PunyCode,
+            EncodeType.UUENCODE,
+            EncodeType.XXENCODE,
+            EncodeType.QUOTE_PRINTABLE,
+            EncodeType.PUNY_CODE,
+            EncodeType.BASE69,
+            EncodeType.BASE65536,
         )
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val isFileMode = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
+    private val fileMode = SimpleBooleanProperty(false)
     private val decodeIgnoreSpace = SimpleBooleanProperty(true)
-    private val isProcessing = SimpleBooleanProperty(false)
-    private var enableDict = SimpleBooleanProperty(true)
+    private val processing = SimpleBooleanProperty(false)
+    private val enableDict = SimpleBooleanProperty(true)
     private val selectedCharset = SimpleStringProperty(CHARSETS.first())
 
     private var taInput: TextArea by singleAssign()
@@ -53,9 +65,7 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
     private var tfCount: TextField by singleAssign()
 
     private val times
-        get() =
-            tfCount.text.toIntOrNull()?.takeIf { it <= 40 }
-                ?: 1.also { tfCount.text = it.toString() }
+        get() = tfCount.text.toIntOrNull() ?: 1.also { tfCount.text = it.toString() }
 
     private val info: String
         get() =
@@ -65,7 +75,7 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
     private val inputText: String
         get() =
             taInput.text.takeIf {
-                isEncode || encodeType in arrayOf(EncodeType.Decimal, EncodeType.Octal)
+                isEncode || encodeType in arrayOf(EncodeType.DECIMAL, EncodeType.OCTAL)
             }
                 ?: taInput.text.takeUnless { decodeIgnoreSpace.get() }
                     ?: taInput.text.stripAllSpace()
@@ -75,13 +85,10 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
     private val eventHandler = fileDraggedHandler {
         taInput.text =
             with(it.first()) {
-                if (isFileMode.get()) {
+                if (fileMode.get()) {
                     this.absolutePath
                 } else {
-                    if (length() <= 10 * 1024 * 1024) {
-                        if (realExtension() in unsupportedExts) "unsupported file extension"
-                        else readText()
-                    } else "not support file larger than 10M"
+                    properText()
                 }
             }
     }
@@ -100,46 +107,40 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
-            checkbox(messages["singleLine"], isSingleLine) {
+            checkbox(messages["singleLine"], singleLine) {
                 selectedProperty().addListener { _, _, newValue ->
                     decodeIgnoreSpace.set(!newValue)
                 }
             }
             checkbox(messages["decodeIgnoreSpace"], decodeIgnoreSpace)
-            checkbox(messages["fileMode"], isFileMode)
+            checkbox(messages["fileMode"], fileMode)
         }
 
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
-                prefRowCount = TEXT_AREA_LINES
-                contextmenu {
-                    item(messages["loadFromNet"]) {
-                        action { runAsync { inputText.readFromNet() } ui { taInput.text = it } }
-                    }
-                    item(messages["loadFromNetLoop"]) {
-                        action {
-                            runAsync { inputText.simpleReadFromNet() } ui { taInput.text = it }
-                        }
-                    }
-                    item(messages["loadFromNet2"]) {
-                        action {
-                            runAsync { inputText.readBytesFromNet().base64() } ui
-                                {
-                                    taInput.text = it
-                                }
-                        }
-                    }
-                    item(messages["readHeadersFromNet"]) {
-                        action {
-                            runAsync { inputText.readHeadersFromNet() } ui { taInput.text = it }
-                        }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
+            prefRowCount = TEXT_AREA_LINES
+            contextmenu {
+                item(messages["reverse"]) { action { taInput.text = inputText.reversed() } }
+
+                item(messages["loadFromNet"]) {
+                    action { runAsync { inputText.readFromNet() } ui { taInput.text = it } }
+                }
+                item(messages["loadFromNetLoop"]) {
+                    action { runAsync { inputText.simpleReadFromNet() } ui { taInput.text = it } }
+                }
+                item(messages["loadFromNet2"]) {
+                    action {
+                        runAsync { inputText.readBytesFromNet().base64() } ui { taInput.text = it }
                     }
                 }
-                textProperty().addListener { _, _, _ -> labelInfo.text = info }
+                item(messages["readHeadersFromNet"]) {
+                    action { runAsync { inputText.readHeadersFromNet() } ui { taInput.text = it } }
+                }
             }
+            textProperty().addListener { _, _, _ -> labelInfo.text = info }
+        }
         hbox {
             addClass(Styles.left)
             paddingTop = DEFAULT_SPACING
@@ -153,13 +154,15 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                     encodeTypeMap.forEach {
                         radiobutton(it.key) {
                             setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
-                            if (it.value == EncodeType.Base64) isSelected = true
+                            if (it.value == EncodeType.BASE64) isSelected = true
                         }
                     }
                     selectedToggleProperty().addListener { _, _, new ->
                         encodeType = new.cast<RadioButton>().text.encodeType()
                         enableDict.value =
-                            encodeType.type.contains("base") && encodeType.type != "base100"
+                            encodeType.type.contains("base") &&
+                                !BASE_ENCODE_EXCLUDED_DICT_LIST.contains(encodeType) ||
+                                encodeType == EncodeType.RADIX_N
                         tfCustomDict.text = encodeType.defaultDict
                         val isIgnore = encodeType !in encodeTypeWithSpace
                         decodeIgnoreSpace.set(isIgnore)
@@ -190,7 +193,9 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
 
                 radiobutton(messages["encode"]) { isSelected = true }
                 radiobutton(messages["decode"])
-                label("times:")
+                label("times:") {
+                    tooltip("encode or decode  times \nor crack minimum result length")
+                }
                 tfCount =
                     textfield("1") {
                         textFormatter = intTextFormatter
@@ -202,11 +207,11 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                 }
             }
             button(messages["run"], imageview(IMG_RUN)) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 action { run() }
             }
             button("crack", imageview("/img/crack.png")) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 action { crack() }
             }
         }
@@ -222,9 +227,9 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                 action {
                     fire(SimpleMsgEvent(taOutput.text, 1))
                     val tabPane = findParentOfType(TabPane::class)
-                    tabPane?.selectionModel?.select(
-                        tabPane.tabs.first { it.text == messages["stringProcess"] }
-                    )
+                    tabPane
+                        ?.selectionModel
+                        ?.select(tabPane.tabs.first { it.text == messages["stringProcess"] })
                 }
             }
             button(graphic = imageview(IMG_UP)) {
@@ -241,12 +246,11 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
             }
         }
 
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-                prefRowCount = TEXT_AREA_LINES
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+            prefRowCount = TEXT_AREA_LINES
+        }
     }
     override val root = borderpane {
         center = centerNode
@@ -257,36 +261,37 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
 
         var result = inputText
         runAsync {
-            isProcessing.value = true
+            processing.value = true
             startTime = System.currentTimeMillis()
 
             runCatching {
-                repeat(times) {
-                    result =
-                        if (isEncode) {
-                            controller.encode2String(
-                                result,
-                                encodeType,
-                                tfCustomDict.text,
-                                selectedCharset.get(),
-                                isSingleLine.get()
-                            )
-                        } else {
-                            controller.decode2String(
-                                result,
-                                encodeType,
-                                tfCustomDict.text,
-                                selectedCharset.get(),
-                                isSingleLine.get()
-                            )
-                        }
+                    if (times > 40) kotlin.error("times should be not large than 40")
+                    repeat(times) {
+                        result =
+                            if (isEncode) {
+                                controller.encode2String(
+                                    result,
+                                    encodeType,
+                                    tfCustomDict.text,
+                                    selectedCharset.get(),
+                                    singleLine.get()
+                                )
+                            } else {
+                                controller.decode2String(
+                                    result,
+                                    encodeType,
+                                    tfCustomDict.text,
+                                    selectedCharset.get(),
+                                    singleLine.get()
+                                )
+                            }
+                    }
+                    result
                 }
-                result
-            }
                 .getOrElse { it.stacktrace() }
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text = it
                 if (Prefs.autoCopy) {
                     outputText.copy().also { primaryStage.showToast(messages["copied"]) }
@@ -299,9 +304,12 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
     private fun crack() {
         startTime = System.currentTimeMillis()
         var encoded =
-            if (isFileMode.get()) taInput.text.toFile().readText()
-            else taInput.text.substringAfter("\t")
-        isProcessing.value = true
+            if (fileMode.get()) {
+                taInput.text.toFile().readText()
+            } else {
+                taInput.text.substringAfter("\t")
+            }
+        processing.value = true
         if (DEBUG) println("read ${System.currentTimeMillis() - startTime}")
         val encodeMethods = mutableListOf<String>()
         runAsync {
@@ -313,9 +321,8 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                         if (DEBUG) println("map $encode ${System.currentTimeMillis() - startTime}")
                         val start = System.currentTimeMillis()
                         encode.type to
-                            kotlin
-                                    .runCatching { controller.decode2String(encoded, encode, "") }
-                                    .getOrElse { it.message }!!
+                            runCatching { controller.decode2String(encoded, encode, "") }
+                                .getOrElse { it.message }!!
                                 .also {
                                     if (DEBUG) {
                                         println(
@@ -329,8 +336,9 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                         (it.second.isEmpty() ||
                                 it.second.contains(encoded, true) ||
                                 it.second.contains(REG_NON_PRINTABLE) ||
-                                it.first == EncodeType.UrlEncode.type &&
-                                    encoded.length == it.second.length)
+                                it.first == EncodeType.URL_ENCODE.type &&
+                                    encoded.length == it.second.length ||
+                                it.second.length < times)
                             .not()
                     }
                     ?.run {
@@ -339,13 +347,12 @@ class EncodeView : Fragment(messages["encodeAndDecode"]) {
                     }
                     ?: break
             }
-            encodeMethods.mapIndexed { i, type -> "${i + 1} $type" }.joinToString("-->") +
-                "\n" +
-                encoded
+            encodeMethods.mapIndexed { i, type -> "${i + 1} $type" }.joinToString("-->")
         } ui
             {
-                isProcessing.value = false
-                taOutput.text = it
+                processing.value = false
+                taOutput.text =
+                    if (encodeMethods.isNotEmpty()) "$it\n$encoded" else "no crack result!!!"
                 timeConsumption = System.currentTimeMillis() - startTime
                 labelInfo.text = info
                 // 手动gc, 立即回收创建的临时字符串

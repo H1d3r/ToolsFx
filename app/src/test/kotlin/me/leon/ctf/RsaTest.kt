@@ -1,5 +1,6 @@
 package me.leon.ctf
 
+import kotlin.test.Ignore
 import kotlin.test.assertEquals
 import me.leon.*
 import me.leon.ctf.rsa.RsaSolver.solve
@@ -155,7 +156,14 @@ class RsaTest {
         assertEquals("flag{20d6e2da95dcc1fa5f5432a436c4be18}", solve(params))
 
         params = "rsa14_wiener2.txt".parseRsaParams()
+        //        println(wiener(params))
         assertEquals("Tr0y{W1eNer_AttaCk_1s_p0werfu1!}", solve(params))
+    }
+
+    @Test
+    fun rsa_wiener3() {
+        val params = "rsa14_wiener_pqr.txt".parseRsaParams()
+        assertEquals("CBCTF{W13ner_4ttack_ca^_d0_m0r3!}", solve(params))
     }
 
     @Test
@@ -179,11 +187,29 @@ class RsaTest {
         // 四个因子
         params = "rsa_19_pqrec2.txt".parseRsaParams()
         solve(params).also { assertEquals("flag{077f0bed-c7dc-46e1-800a-bb2dc27a218f}", it) }
+        // e phi不互素
+        params = "rsa_19_pqrec3_e_phi_not_coprime.txt".parseRsaParams()
+        solve(params).also { assertEquals("HECTF{Congratulation!!you_find_flag}", it) }
     }
 
     @Test
+    @Ignore
     fun rsa_n2ec() {
         val params = "rsa_20_n2ec.txt".parseRsaParams()
         solve(params).also { assertEquals("SangFor{qSccmm1WrgvIg2Uq_cZhmqNfEGTz2GV8}", it) }
+    }
+
+    @Test
+    fun amm() {
+        val params = "rsa_amm.txt".parseRsaParams()
+        assertEquals("flag{Enj01_m1sc_A0d_cr0}", solve(params))
+    }
+
+    /** It takes 10min+, depends on your cpu */
+    @Test
+    @Ignore
+    fun amm2() {
+        val params = "rsa_amm2.txt".parseRsaParams()
+        println(solve(params))
     }
 }

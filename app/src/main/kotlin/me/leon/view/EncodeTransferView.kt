@@ -18,13 +18,12 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
 
     private var timeConsumption = 0L
     private var startTime = 0L
-    private var dstEncodeType = EncodeType.UrlEncode
-    private var srcEncodeType = EncodeType.Base64
-    private var isEncode = true
+    private var dstEncodeType = EncodeType.URL_ENCODE
+    private var srcEncodeType = EncodeType.BASE64
 
     override val closeable = SimpleBooleanProperty(false)
-    private var enableDict = SimpleBooleanProperty(true)
-    private val isSingleLine = SimpleBooleanProperty(false)
+    private val enableDict = SimpleBooleanProperty(true)
+    private val singleLine = SimpleBooleanProperty(false)
     private val selectedSrcCharset = SimpleStringProperty(CHARSETS.first())
     private val selectedDstCharset = SimpleStringProperty(CHARSETS.first())
 
@@ -37,23 +36,11 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
             " $srcEncodeType --> $dstEncodeType  ${messages["inputLength"]}: ${inputText.length}" +
                 "  ${messages["outputLength"]}: ${outputText.length} cost: $timeConsumption ms"
     private val inputText: String
-        get() =
-            taInput.text.takeIf {
-                isEncode || srcEncodeType in arrayOf(EncodeType.Decimal, EncodeType.Octal)
-            }
-                ?: taInput.text.stripAllSpace()
+        get() = taInput.text
     private val outputText: String
         get() = taOutput.text
 
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 128 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 128KB"
-            }
-    }
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
 
     private val centerNode = vbox {
         paddingAll = DEFAULT_SPACING
@@ -81,26 +68,27 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
                     encodeTypeMap.forEach {
                         radiobutton(it.key) {
                             setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
-                            if (it.value == EncodeType.Base64) isSelected = true
+                            if (it.value == EncodeType.BASE64) isSelected = true
                         }
                     }
                     selectedToggleProperty().addListener { _, _, new ->
                         srcEncodeType = new.cast<RadioButton>().text.encodeType()
                         enableDict.value =
-                            srcEncodeType.type.contains("base") && srcEncodeType.type != "base100"
+                            srcEncodeType.type.contains("base") &&
+                                !BASE_ENCODE_EXCLUDED_DICT_LIST.contains(srcEncodeType) ||
+                                srcEncodeType == EncodeType.RADIX_N
                         tfCustomDict.text = srcEncodeType.defaultDict
                     }
                 }
             }
         }
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                prefRowCount = TEXT_AREA_LINES - 2
-                onDragEntered = eventHandler
-                textProperty().addListener { _, _, _ -> labelInfo.text = info }
-            }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            prefRowCount = TEXT_AREA_LINES - 2
+            onDragEntered = eventHandler
+            textProperty().addListener { _, _, _ -> labelInfo.text = info }
+        }
 
         hbox {
             label(messages["customDict"])
@@ -115,7 +103,7 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
             paddingTop = DEFAULT_SPACING
             hgap = DEFAULT_SPACING * 2
             alignment = Pos.CENTER
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             button(messages["transfer"], imageview(IMG_RUN)) {
                 action { run() }
                 setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
@@ -148,12 +136,14 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
                 alignment = Pos.TOP_LEFT
                 prefColumns = 7
                 togglegroup {
-                    encodeTypeMap.forEach {
-                        radiobutton(it.key) {
-                            setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
-                            if (it.value == EncodeType.UrlEncode) isSelected = true
+                    encodeTypeMap
+                        .filterNot { it.value == EncodeType.RADIX_N }
+                        .forEach {
+                            radiobutton(it.key) {
+                                setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
+                                if (it.value == EncodeType.URL_ENCODE) isSelected = true
+                            }
                         }
-                    }
                     selectedToggleProperty().addListener { _, _, new ->
                         dstEncodeType = new.cast<RadioButton>().text.encodeType()
                         run()
@@ -162,12 +152,11 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
             }
         }
 
-        taOutput =
-            textarea {
-                prefRowCount = TEXT_AREA_LINES - 2
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            prefRowCount = TEXT_AREA_LINES - 2
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
 
     override val root = borderpane {
@@ -178,7 +167,7 @@ class EncodeTransferView : Fragment(messages["encodeTransfer"]) {
     private fun run() {
         runAsync {
             startTime = System.currentTimeMillis()
-            if (isSingleLine.get()) {
+            if (singleLine.get()) {
                 inputText.lineAction2String {
                     val decode =
                         controller.decode(

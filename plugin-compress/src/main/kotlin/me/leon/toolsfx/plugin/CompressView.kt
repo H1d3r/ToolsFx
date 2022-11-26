@@ -24,7 +24,7 @@ class CompressView : PluginFragment(messages["compression"]) {
 
     private val controller: CompressController by inject()
     override val closeable = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
+    private val processing = SimpleBooleanProperty(false)
     private lateinit var taInput: TextArea
     private lateinit var tgInput: ToggleGroup
     private lateinit var tgOutput: ToggleGroup
@@ -41,15 +41,7 @@ class CompressView : PluginFragment(messages["compression"]) {
     private var inputEncode = "raw"
     private var outputEncode = "base64"
 
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 10 * 1024 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 10M"
-            }
-    }
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
 
     private val algs = compressTypeMap.values.map { it.alg }
     private val selectedAlg = SimpleStringProperty(algs[2])
@@ -57,7 +49,7 @@ class CompressView : PluginFragment(messages["compression"]) {
     private val cipher
         get() = selectedAlg.get()
     private val selectedCharset = SimpleStringProperty(CHARSETS.first())
-    private val isSingleLine = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
     private val centerNode = vbox {
         title = messages["compression"]
         paddingAll = DEFAULT_SPACING
@@ -66,27 +58,25 @@ class CompressView : PluginFragment(messages["compression"]) {
             label(messages["input"])
             spacing = DEFAULT_SPACING
             alignment = Pos.CENTER_LEFT
-            tgInput =
-                togglegroup {
-                    radiobutton("raw") { isSelected = true }
-                    radiobutton("base64")
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        inputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgInput = togglegroup {
+                radiobutton("raw") { isSelected = true }
+                radiobutton("base64")
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    inputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview("/img/import.png")) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
-            }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
+        }
 
         hbox {
             alignment = Pos.CENTER_LEFT
@@ -126,9 +116,9 @@ class CompressView : PluginFragment(messages["compression"]) {
                     doCrypto()
                 }
             }
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             button(messages["run"], imageview(IMG_RUN)) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 action { doCrypto() }
             }
         }
@@ -136,16 +126,15 @@ class CompressView : PluginFragment(messages["compression"]) {
             spacing = DEFAULT_SPACING
             alignment = Pos.CENTER_LEFT
             label(messages["output"])
-            tgOutput =
-                togglegroup {
-                    radiobutton("raw")
-                    radiobutton("base64") { isSelected = true }
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        println("output ${newValue.cast<RadioButton>().text}")
-                        outputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgOutput = togglegroup {
+                radiobutton("raw")
+                radiobutton("base64") { isSelected = true }
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    println("output ${newValue.cast<RadioButton>().text}")
+                    outputEncode = newValue.cast<RadioButton>().text
                 }
+            }
             button(graphic = imageview(IMG_COPY)) {
                 tooltip(messages["copy"])
                 action { outputText.copy() }
@@ -161,11 +150,10 @@ class CompressView : PluginFragment(messages["compression"]) {
                 }
             }
         }
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
     override val root = borderpane {
         center = centerNode
@@ -174,14 +162,14 @@ class CompressView : PluginFragment(messages["compression"]) {
 
     private fun doCrypto() {
         runAsync {
-            isProcessing.value = true
+            processing.value = true
             if (isCompress) {
                 controller.compress(
                     inputText,
                     cipher.compressType(),
                     inputEncode,
                     outputEncode,
-                    isSingleLine.get(),
+                    singleLine.get(),
                 )
             } else {
                 controller.decompress(
@@ -189,12 +177,12 @@ class CompressView : PluginFragment(messages["compression"]) {
                     cipher.compressType(),
                     inputEncode,
                     outputEncode,
-                    isSingleLine.get(),
+                    singleLine.get(),
                 )
             }
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text = it
                 infoLabel.text = info
                 if (Prefs.autoCopy) it.copy().also { primaryStage.showToast(messages["copied"]) }

@@ -24,7 +24,7 @@ class BigIntFragment : Fragment("BigInt") {
     private var selectedAlgo: String = calculatorType.keys.first()
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
+    private val processing = SimpleBooleanProperty(false)
     private val selectedRadix = SimpleStringProperty("10")
 
     private var bottomView: Label by singleAssign()
@@ -35,7 +35,7 @@ class BigIntFragment : Fragment("BigInt") {
     private var ta4: TextArea by singleAssign()
     private var ta5: TextArea by singleAssign()
     private var ta6: TextArea by singleAssign()
-
+    @Suppress("TrimMultilineRawString")
     private val bottomInfo
         get() =
             "Func: $selectedAlgo radix: ${selectedRadix.get()} bits: P=${ta1.bits()}  " +
@@ -100,7 +100,7 @@ class BigIntFragment : Fragment("BigInt") {
                 label("radix:")
                 combobox(selectedRadix, radix) { cellFormat { text = it } }
                 button(messages["run"], imageview(IMG_RUN)) {
-                    enableWhen(!isProcessing)
+                    enableWhen(!processing)
                     action { calculate() }
                 }
                 button("ECC Calc") { action { find<ECCurveCalculator>().openWindow() } }
@@ -111,74 +111,74 @@ class BigIntFragment : Fragment("BigInt") {
 
     private fun outputLayout(vBox: VBox) {
         hbox {
-            addClass(Styles.left)
-            label(messages["output"])
-            button("P", graphic = imageview(IMG_UP)) {
-                tooltip(messages["up"])
-                action {
-                    if (selectedAlgo == Calculator.FACTOR.algo) {
-                        val lines = outputText.lines()
-                        ta1.text = lines.first()
-                        ta2.text = lines.last()
-                    } else {
-                        ta1.text = outputText
-                    }
+                addClass(Styles.left)
+                label(messages["output"])
+                button("P", graphic = imageview(IMG_UP)) {
+                    tooltip(messages["up"])
+                    action {
+                        if (selectedAlgo == Calculator.FACTOR.algo) {
+                            val lines = outputText.lines()
+                            ta1.text = lines.first()
+                            ta2.text = lines.last()
+                        } else {
+                            ta1.text = outputText
+                        }
 
-                    taOutput.text = ""
-                }
-            }
-            button("Q", graphic = imageview(IMG_UP)) {
-                tooltip(messages["up"])
-                action {
-                    if (selectedAlgo == Calculator.FACTOR.algo) {
-                        val lines = outputText.lines()
-                        ta1.text = lines.first()
-                        ta2.text = lines.last()
-                    } else {
-                        ta2.text = outputText
+                        taOutput.text = ""
                     }
-                    taOutput.text = ""
+                }
+                button("Q", graphic = imageview(IMG_UP)) {
+                    tooltip(messages["up"])
+                    action {
+                        if (selectedAlgo == Calculator.FACTOR.algo) {
+                            val lines = outputText.lines()
+                            ta1.text = lines.first()
+                            ta2.text = lines.last()
+                        } else {
+                            ta2.text = outputText
+                        }
+                        taOutput.text = ""
+                    }
+                }
+                button("N", graphic = imageview(IMG_UP)) {
+                    tooltip(messages["up"])
+                    action {
+                        ta3.text = outputText
+                        taOutput.text = ""
+                    }
+                }
+                button("e", graphic = imageview(IMG_UP)) {
+                    tooltip(messages["up"])
+                    action {
+                        ta4.text = outputText
+                        taOutput.text = ""
+                    }
+                }
+                button("d", graphic = imageview(IMG_UP)) {
+                    tooltip(messages["up"])
+                    action {
+                        ta5.text = outputText
+                        taOutput.text = ""
+                    }
+                }
+                button(graphic = imageview(IMG_COPY)) {
+                    tooltip(messages["copy"])
+                    action { outputText.copy() }
                 }
             }
-            button("N", graphic = imageview(IMG_UP)) {
-                tooltip(messages["up"])
-                action {
-                    ta3.text = outputText
-                    taOutput.text = ""
-                }
-            }
-            button("e", graphic = imageview(IMG_UP)) {
-                tooltip(messages["up"])
-                action {
-                    ta4.text = outputText
-                    taOutput.text = ""
-                }
-            }
-            button("d", graphic = imageview(IMG_UP)) {
-                tooltip(messages["up"])
-                action {
-                    ta5.text = outputText
-                    taOutput.text = ""
-                }
-            }
-            button(graphic = imageview(IMG_COPY)) {
-                tooltip(messages["copy"])
-                action { outputText.copy() }
-            }
-        }
             .also { vBox.add(it) }
         taOutput =
             textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-                prefRowCount = TEXT_AREA_LINES - 2
-                contextmenu {
-                    item("numberToString") { action { number2String() } }
-                    item("stringToNumber") { action { string2Number() } }
-                    item("numberToBase64") { action { number2Base64() } }
-                    item("base64ToNumber") { action { base64ToNumber() } }
+                    promptText = messages["outputHint"]
+                    isWrapText = true
+                    prefRowCount = TEXT_AREA_LINES - 2
+                    contextmenu {
+                        item("numberToString") { action { number2String() } }
+                        item("stringToNumber") { action { string2Number() } }
+                        item("numberToBase64") { action { number2Base64() } }
+                        item("base64ToNumber") { action { base64ToNumber() } }
+                    }
                 }
-            }
                 .also { vBox.add(it) }
     }
 
@@ -207,56 +207,50 @@ class BigIntFragment : Fragment("BigInt") {
 
     private fun inputLayout(vBox: VBox) {
         hbox {
-            prefHeight = DEFAULT_SPACING_10X
-            alignment = Pos.CENTER_LEFT
-            label("P:")
-            ta1 =
-                textarea {
+                prefHeight = DEFAULT_SPACING_10X
+                alignment = Pos.CENTER_LEFT
+                label("P:")
+                ta1 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
-            label("Q:")
-            ta2 =
-                textarea {
+                label("Q:")
+                ta2 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
-        }
+            }
             .also { vBox.add(it) }
         hbox {
-            prefHeight = DEFAULT_SPACING_10X
-            alignment = Pos.CENTER_LEFT
-            label("N:")
-            ta3 =
-                textarea {
+                prefHeight = DEFAULT_SPACING_10X
+                alignment = Pos.CENTER_LEFT
+                label("N:")
+                ta3 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
 
-            label("e:")
-            ta4 =
-                textarea {
+                label("e:")
+                ta4 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
-        }
+            }
             .also { vBox.add(it) }
         hbox {
-            prefHeight = DEFAULT_SPACING_10X
-            alignment = Pos.CENTER_LEFT
-            label("d:")
-            ta5 =
-                textarea {
+                prefHeight = DEFAULT_SPACING_10X
+                alignment = Pos.CENTER_LEFT
+                label("d:")
+                ta5 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
-            label("C:")
-            ta6 =
-                textarea {
+                label("C:")
+                ta6 = textarea {
                     isWrapText = true
                     prefWidth = DEFAULT_SPACING_40X
                 }
-        }
+            }
             .also { vBox.add(it) }
     }
 
@@ -265,7 +259,7 @@ class BigIntFragment : Fragment("BigInt") {
             return
         }
         runAsync {
-            isProcessing.value = true
+            processing.value = true
             startTime = System.currentTimeMillis()
             controller.calculate(
                 selectedAlgo,
@@ -281,7 +275,7 @@ class BigIntFragment : Fragment("BigInt") {
             )
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 outputText =
                     runCatching {
                             it.lines().joinToString("\n") {

@@ -1567,7 +1567,9 @@ class BCrypt {
         private fun char64(x: Char): Byte {
             return if (x.code < 0 || x.code >= index_64.size) {
                 -1
-            } else index_64[x.code]
+            } else {
+                index_64[x.code]
+            }
         }
 
         /**
@@ -1722,7 +1724,9 @@ class BCrypt {
                 require(
                     !(minor != 'a' && minor != 'x' && minor != 'y' && minor != 'b' ||
                         salt[3] != '$')
-                ) { "Invalid salt revision" }
+                ) {
+                    "Invalid salt revision"
+                }
                 off = 4
             }
 
@@ -1778,7 +1782,9 @@ class BCrypt {
             require(
                 !(!prefix.startsWith("$2") ||
                     prefix[2] != 'a' && prefix[2] != 'y' && prefix[2] != 'b')
-            ) { "Invalid prefix" }
+            ) {
+                "Invalid prefix"
+            }
             require(!(logRounds < 4 || logRounds > 31)) { "Invalid logRounds" }
             rs.append("$2")
             rs.append(prefix[2])

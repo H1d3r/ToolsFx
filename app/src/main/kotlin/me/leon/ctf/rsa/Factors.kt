@@ -7,15 +7,15 @@ import me.leon.factorDb
 /** 时间复杂度 O(sqrt(N)) 优化 加入试除后 素数判断 */
 val THREE = 3.toBigInteger()
 val MAX_DIVIDER = 10_000.toBigInteger()
-const val MAX_FERMAT_ITERATION = 1_000_000
-const val MAX_POLLARD_ITERATION = 1_000
+const val TIME_OUT = 2_000
 
 /** 小于 1_000_000 时间复杂度 O(sqrt(N)) */
 fun BigInteger.trialDivide(maxDivider: BigInteger = MAX_DIVIDER): MutableList<BigInteger> {
-    val factors = mutableListOf<BigInteger>()
     // optimize, avoid prime loop
-    if (isProbablePrime(100)) return factors.apply { add(this@trialDivide) }
-    println("div: start divide")
+    if (isProbablePrime(100)) return mutableListOf(this@trialDivide)
+
+    val factors = mutableListOf<BigInteger>()
+    //    println("div: start divide")
     // avoid large number slow computation
     if (bitLength() > 100) return factors.apply { add(this@trialDivide.negate()) }
     var n = this
@@ -40,25 +40,29 @@ fun BigInteger.trialDivide(maxDivider: BigInteger = MAX_DIVIDER): MutableList<Bi
         if (f > maxDivider) break
     }
     if (n != ONE) factors.add(if (n.isProbablePrime(100)) n else n.negate())
-    println("div: end divide. found ${factors.size} factors")
+    //    println("div: end divide. found ${factors.size} factors")
     return factors
 }
 
 /** 适用因子相差较小 时间复杂度 O(|p-q|) */
-fun BigInteger.fermat(iteration: Int = 10_000): MutableList<BigInteger> {
+fun BigInteger.fermat(timeOut: Int = TIME_OUT): MutableList<BigInteger> {
     with(sqrtAndRemainder()) {
         if (this.last() != ZERO) {
             var a = first() + ONE
             var count = 0
             var b: BigInteger
-            while (count < iteration) {
+            val startTime = System.currentTimeMillis()
+
+            while (System.currentTimeMillis() - startTime < timeOut) {
                 val b1 = a.pow(2) - this@fermat
                 b = b1.sqrt()
                 count++
                 if (b * b == b1) {
                     println("solved iteration $count \n\tp = ${a + b} \n\tq= ${a - b}\n")
                     return mutableListOf(a + b, a - b)
-                } else a++
+                } else {
+                    a++
+                }
             }
         }
     }
@@ -67,17 +71,17 @@ fun BigInteger.fermat(iteration: Int = 10_000): MutableList<BigInteger> {
 }
 
 fun BigInteger.pollardsRhoFactors(
-    iteration: Int = MAX_POLLARD_ITERATION,
+    timeOut: Int = TIME_OUT,
     funBias: BigInteger = ONE
 ): MutableList<BigInteger> {
-    val factors = mutableListOf<BigInteger>()
-    // optimize, avoid prime loop
-    if (isProbablePrime(100)) return factors.apply { add(this@pollardsRhoFactors) }
 
+    // optimize, avoid prime loop
+    if (isProbablePrime(100)) return mutableListOf(this@pollardsRhoFactors)
+
+    val factors = mutableListOf<BigInteger>()
     var n: BigInteger = this
     var rho: BigInteger
-
-    while (n.pollardsRho(funBias, maxIteration = iteration).also { rho = it } != n) {
+    while (n.pollardsRho(funBias, timeOut = timeOut).also { rho = it } != n) {
         println("rho $rho")
         if (rho < ZERO) return factors.apply { add(rho) }
         factors.add(rho)
@@ -88,12 +92,10 @@ fun BigInteger.pollardsRhoFactors(
 }
 
 /** 小因子速度更快 时间复杂度 O(n^1/4). */
-fun BigInteger.pollardsRho(
-    funBias: BigInteger = ONE,
-    maxIteration: Int = MAX_POLLARD_ITERATION
-): BigInteger {
+fun BigInteger.pollardsRho(funBias: BigInteger = ONE, timeOut: Int = TIME_OUT): BigInteger {
     // optimize, avoid prime loop
     if (isProbablePrime(100)) return this
+
     println("rho: start factor $this")
     var iteration = 0L
     var x = TWO
@@ -101,7 +103,7 @@ fun BigInteger.pollardsRho(
     var d = ONE
     // Floyd's cycle-finding algorithm
     // val f = { a: BigInteger -> (a.pow(2) + funBias) % this }
-
+    val startTime = System.currentTimeMillis()
     // Richard Brent's cycle finding method
     val f = { a: BigInteger -> (a.modPow(this - ONE, this) + funBias) % this }
     while (d == ONE) {
@@ -109,21 +111,21 @@ fun BigInteger.pollardsRho(
         x = f(x)
         y = f(f(y))
         d = gcd((x - y).abs())
-        if (iteration >= maxIteration) return this.negate()
+        if (System.currentTimeMillis() - startTime >= timeOut) return this.negate()
     }
     println("rho: iteration $iteration found $d ")
     return d
 }
 
-fun BigInteger.pollardsPM1Factors(iteration: Int = MAX_POLLARD_ITERATION): MutableList<BigInteger> {
-    val factors = mutableListOf<BigInteger>()
+fun BigInteger.pollardsPM1Factors(timeOut: Int = TIME_OUT): MutableList<BigInteger> {
     // optimize, avoid prime loop
-    if (isProbablePrime(100)) return factors.apply { add(this@pollardsPM1Factors) }
+    if (isProbablePrime(100)) return mutableListOf(this@pollardsPM1Factors)
 
+    val factors = mutableListOf<BigInteger>()
     var n: BigInteger = this
     var rho: BigInteger
 
-    while (n.pMinus1(maxIteration = iteration).also { rho = it } != n) {
+    while (n.pMinus1(timeOut = timeOut).also { rho = it } != n) {
         println("rho $rho")
         factors.add(rho)
         if (rho < ZERO) return factors
@@ -133,13 +135,14 @@ fun BigInteger.pollardsPM1Factors(iteration: Int = MAX_POLLARD_ITERATION): Mutab
     return factors
 }
 
-fun BigInteger.pMinus1(maxIteration: Int = MAX_POLLARD_ITERATION): BigInteger {
+fun BigInteger.pMinus1(timeOut: Int = TIME_OUT): BigInteger {
     // optimize, avoid prime loop
     if (isProbablePrime(100)) return this
     println("pm1: start factor $this")
     var m = TWO
     var i = ONE
     var iteration = 0L
+    val startTime = System.currentTimeMillis()
     while (i < this) {
         iteration++
         m = m.pow(i.toInt()) % this
@@ -148,7 +151,7 @@ fun BigInteger.pMinus1(maxIteration: Int = MAX_POLLARD_ITERATION): BigInteger {
             println("pm1: found $gcd iteration: $iteration")
             return gcd
         }
-        if (iteration >= maxIteration) return this.negate()
+        if (System.currentTimeMillis() - startTime >= timeOut) break
         i += ONE
     }
 
@@ -170,7 +173,7 @@ fun BigInteger.factor(): MutableList<BigInteger> {
             },
             {
                 println("---fermat---")
-                it.fermat(MAX_POLLARD_ITERATION)
+                it.fermat(TIME_OUT)
             },
             {
                 println("---rho: x^2 + 3---")

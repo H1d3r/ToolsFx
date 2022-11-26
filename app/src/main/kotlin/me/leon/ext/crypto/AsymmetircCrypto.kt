@@ -77,14 +77,14 @@ fun File.parsePublicKeyFromCerFile(): String {
     }
 }
 
-fun String.toPublicKey(alg: String): PublicKey? {
+fun String.toPublicKey(alg: String): PublicKey? =
     try {
         val keySpec = X509EncodedKeySpec(getPropPublicKey(this))
-        return KeyFactory.getInstance(alg.properKeyPairAlg()).generatePublic(keySpec)
+        KeyFactory.getInstance(alg.properKeyPairAlg()).generatePublic(keySpec)
     } catch (ignore: Exception) {
         if (alg.contains("RSA")) {
             // rsa n e d p 参数解析
-            return with(parseRsaParams()) {
+            with(parseRsaParams()) {
                 KeyFactory.getInstance(alg.properKeyPairAlg())
                     .generatePublic(
                         RSAPublicKeySpec(
@@ -93,10 +93,10 @@ fun String.toPublicKey(alg: String): PublicKey? {
                         )
                     )
             }
+        } else {
+            null
         }
-        return null
     }
-}
 
 fun String.toPrivateKey(alg: String): PrivateKey? =
     try {
@@ -108,7 +108,9 @@ fun String.toPrivateKey(alg: String): PrivateKey? =
                 KeyFactory.getInstance(alg.properKeyPairAlg())
                     .generatePrivate(RSAPrivateKeySpec(this["n"], this["d"]))
             }
-        } else null
+        } else {
+            null
+        }
     }
 
 fun ByteArray.pubDecrypt(key: String, alg: String) = pubDecrypt(key.toPublicKey(alg), alg)
@@ -155,19 +157,24 @@ private fun String.properOAEPAlg() = if (isOAEP()) this.replace("OAEP", RSA_PADD
 private fun String.isOAEP() = endsWith("OAEP")
 
 fun ByteArray.pubEncrypt(key: String, alg: String, reserved: Int = 11) =
-    if (alg == "SM2") sm2(true, key.removePemInfo().keyAutoDecode().toECPublicKeyParams())
-    else pubEncrypt(key.toPublicKey(alg), alg, reserved)
-
-val HEX_REGEX = "^[\\da-fA-F]+$".toRegex()
+    if (alg == "SM2") {
+        sm2(true, key.removePemInfo().keyAutoDecode().toECPublicKeyParams())
+    } else {
+        pubEncrypt(key.toPublicKey(alg), alg, reserved)
+    }
 
 fun String.keyAutoDecode(): ByteArray =
-    if (HEX_REGEX.matches(this)) hex2ByteArray() else base64Decode()
+    if (HEX_REGEX.matches(this)) {
+        hex2ByteArray()
+    } else {
+        base64Decode()
+    }
 
 fun ByteArray.asymmetricDecrypt(
     key: Key?,
     alg: String,
 ): ByteArray =
-    Cipher.getInstance(alg.properOAEPAlg(), BouncyCastleProvider.PROVIDER_NAME).run {
+    Cipher.getInstance(alg.properOAEPAlg()).run {
         println("alg $alg")
         if (alg.isOAEP()) {
             init(Cipher.DECRYPT_MODE, key, OAEP_PARAM_SPEC_SHA1)
@@ -199,8 +206,11 @@ fun ByteArray.privateDecrypt(
     key: String,
     alg: String,
 ): ByteArray =
-    if (alg == "SM2") sm2(false, key.keyAutoDecode().toECPrivateKeyParams())
-    else asymmetricDecrypt(key.toPrivateKey(alg), alg)
+    if (alg == "SM2") {
+        sm2(false, key.keyAutoDecode().toECPrivateKeyParams())
+    } else {
+        asymmetricDecrypt(key.toPrivateKey(alg), alg)
+    }
 
 fun ByteArray.asymmetricEncrypt(key: Key?, alg: String, reserved: Int = 11): ByteArray =
     Cipher.getInstance(alg.properOAEPAlg()).run {
@@ -299,9 +309,12 @@ fun genKeyPair(alg: String, params: List<Any> = emptyList()): KeyPair =
     }
 
 fun checkKeyPair(pub: String, pri: String, alg: String = "RSA"): Boolean {
-    val testData = byteArrayOf(67)
+    val testData = "123".toByteArray()
+    println(testData.base64())
     return testData.asymmetricEncrypt(pub.toPublicKey(alg), alg).run {
-        asymmetricDecrypt(pri.toPrivateKey(alg), alg).contentEquals(testData)
+        asymmetricDecrypt(pri.toPrivateKey(alg), alg)
+            .also { println(it.decodeToString()) }
+            .contentEquals(testData)
     }
 }
 

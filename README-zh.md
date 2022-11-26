@@ -3,7 +3,9 @@
 <h1 align="center">ToolsFx</h1>
 <p align="center">
 <a href="https://github.com/Leon406/ToolsFx/releases/latest"><img src="https://img.shields.io/github/release/Leon406/ToolsFx.svg"/></a>
-<a href="https://github.com/Leon406/ToolsFx/actions/workflows/detekt-analysis.yml/badge.svg"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/detekt-analysis.yml/badge.svg"/></a><img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
+<a href="https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml/badge.svg"/></a>
+<a href="https://github.com/Leon406/ToolsFx/actions/workflows/detekt.yml"><img src="https://github.com/Leon406/ToolsFx/actions/workflows/detekt.yml/badge.svg"/></a>
+<img src="https://img.shields.io/badge/language-kotlin-orange.svg"/>
 <a href="changelog.md"><img src="https://img.shields.io/badge/updates-%E6%9B%B4%E6%96%B0%E6%97%A5%E5%BF%97-brightgreen"/></a>
 <img src="https://img.shields.io/badge/license-ISC-green"/>
 <img src="https://img.shields.io/github/downloads/Leon406/Toolsfx/total"/>
@@ -218,7 +220,7 @@
 - [x] Auto Key
 - [x] 栅栏密码 / 栅栏密码 w
 - [x] playfair
-- [x] brainfuck/troll/ook(仅解密)
+- [x] brainfuck/troll/ook
 - [x] 盲文 (braille)
 - [x] 字母位置
 - [x] 01248(云影)
@@ -268,6 +270,22 @@
 
 bouncy castle文档 https://www.bouncycastle.org/specifications.html
 
+
+
+## TODO
+
+### 图片模块
+
+- 二进制01转图片
+- 二进制01转二维码
+- base64转图片
+
+### misc模块
+
+- 时间戳转换
+- 生成uuid （支持多组）
+- 端口扫描
+
 ## 下载地址
 
 [GitHub](https://github.com/Leon406/ToolsFx/releases)
@@ -294,6 +312,8 @@ bouncy castle文档 https://www.bouncycastle.org/specifications.html
 
    需要复制到lib目录,同时删除ToolsFx-xxx.jar(旧文件名)和 app-xxx.jar
 
+- [github action nightly版本(同beta版本,实时构建)](https://github.com/Leon406/ToolsFx/actions/workflows/app-test.yml)
+
 ## 如何运行
 
 - Linux/Mac OSX系统双击运行 根目录下 ToolsFx
@@ -303,16 +323,17 @@ bouncy castle文档 https://www.bouncycastle.org/specifications.html
 
 启动时,默认会生成配置文件ToolsFx.properties, 修改对应的值即可
 
-| key                     | value                                     |
-| ----------------------- | ----------------------------------------- |
-| isEnableClassical       | 古典密码学启用开关,默认false              |
-| isEnablePBE             | PBE启用开关,默认false                     |
-| isEnableSignature       | 签名启用开关,默认true                     |
-| isEnableMac             | MAC启用开关,默认true                      |
-| isEnableSymmetricStream | 对称加密(stream)启用开关,默认true         |
-| isEnableQrcode          | 二维码启用开关,默认true                   |
-| isEnableInternalWebview | 内置浏览器启用开关,默认false              |
-| extUrls                 | 内置浏览器默认收藏链接,多个用英文逗号分隔 |
+| key                     | value                   |
+|-------------------------|-------------------------|
+| isEnableClassical       | 古典密码学启用开关,默认false       |
+| isEnablePBE             | PBE启用开关,默认false         |
+| isEnableSignature       | 签名启用开关,默认true           |
+| isEnableMac             | MAC启用开关,默认true          |
+| isEnableSymmetricStream | 对称加密(stream)启用开关,默认true |
+| isEnableQrcode          | 二维码启用开关,默认true          |
+| isEnableInternalWebview | 内置浏览器启用开关,默认false       |
+| offlineMode             | 离线模式,不显示联网的功能,默认false   |
+| extUrls                 | 内置浏览器默认收藏链接,多个用英文逗号分隔   |
 
 ## [插件](README-plugin-zh.md)
 

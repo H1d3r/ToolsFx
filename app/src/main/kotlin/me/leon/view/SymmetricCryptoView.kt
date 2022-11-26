@@ -72,12 +72,12 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
     private val modes = mutableListOf("CBC", "ECB", "CFB", "OFB", "CTR", "GCM", "CCM", "EAX", "OCB")
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isFile = SimpleBooleanProperty(false)
-    private val isProcessing = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val isEnableIv = SimpleBooleanProperty(true)
-    private val isEnableAEAD = SimpleBooleanProperty(false)
-    private val isEnableModAndPadding = SimpleBooleanProperty(true)
+    private val fileProperty = SimpleBooleanProperty(false)
+    private val processing = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
+    private val enableIv = SimpleBooleanProperty(true)
+    private val enableAEAD = SimpleBooleanProperty(false)
+    private val enableModAndPadding = SimpleBooleanProperty(true)
     private val selectedAlg = SimpleStringProperty(algs[2])
     private val selectedPadding = SimpleStringProperty(paddingsAlg.first())
     private val selectedCharset = SimpleStringProperty(CHARSETS.first())
@@ -88,7 +88,7 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
     private var tgOutput: ToggleGroup by singleAssign()
     private var taOutput: TextArea by singleAssign()
     private var labelInfo: Label by singleAssign()
-    private val keyIvInputView = KeyIvInputView(isEnableIv, isEnableAEAD)
+    private val keyIvInputView = KeyIvInputView(enableIv, enableAEAD)
 
     private val inputText: String
         get() = taInput.text
@@ -97,30 +97,28 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
 
     private val info
         get() =
-            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode:  ${isFile.get()} " +
+            "Cipher: $cipher   charset: ${selectedCharset.get()}  file mode:  ${fileProperty.get()} " +
                 "${messages["inputLength"]}: ${inputText.length}  " +
                 "${messages["outputLength"]}: ${outputText.length}  " +
                 "cost: $timeConsumption ms"
 
     private val eventHandler = fileDraggedHandler {
         taInput.text =
-            if (isFile.get()) {
+            if (fileProperty.get()) {
                 it.joinToString(System.lineSeparator(), transform = File::getAbsolutePath)
             } else {
-                with(it.first()) {
-                    if (length() <= 128 * 1024) {
-                        if (realExtension() in unsupportedExts) "unsupported file extension"
-                        else readText()
-                    } else "not support file larger than 128K,plz use file mode!!!"
-                }
+                it.first().properText(hints = "128KB, plz use file mode!!!")
             }
     }
 
     private val cipher
         get() =
             with(selectedAlg.get()) {
-                if (this in customAlg) selectedAlg.get()
-                else "$this/${selectedMod.get()}/${selectedPadding.get()}"
+                if (this in customAlg) {
+                    selectedAlg.get()
+                } else {
+                    "$this/${selectedMod.get()}/${selectedPadding.get()}"
+                }
             }
 
     private val centerNode = vbox {
@@ -128,46 +126,42 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
         hbox {
             label(messages["input"])
             addClass(Styles.left)
-            tgInput =
-                togglegroup {
-                    radiobutton("raw") { isSelected = true }
-                    radiobutton("base64")
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        inputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgInput = togglegroup {
+                radiobutton("raw") { isSelected = true }
+                radiobutton("base64")
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    inputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview("/img/import.png")) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taInput.text = clipboardText() }
             }
         }
-        taInput =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = eventHandler
-                contextmenu {
-                    item(messages["loadFromNetLoop"]) {
-                        action {
-                            runAsync { inputText.simpleReadFromNet() } ui { taInput.text = it }
-                        }
-                    }
+        taInput = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = eventHandler
+            contextmenu {
+                item(messages["loadFromNetLoop"]) {
+                    action { runAsync { inputText.simpleReadFromNet() } ui { taInput.text = it } }
                 }
             }
+        }
         hbox {
             addClass(Styles.left)
             label(messages["alg"])
             combobox(selectedAlg, algs) { cellFormat { text = it } }
             label("mode:")
             combobox(selectedMod, modes) {
-                enableWhen(isEnableModAndPadding)
+                enableWhen(enableModAndPadding)
                 cellFormat { text = it }
             }
             label("padding:")
             combobox(selectedPadding, paddingsAlg) {
-                enableWhen(isEnableModAndPadding)
+                enableWhen(enableModAndPadding)
                 cellFormat { text = it }
             }
             label("charset:")
@@ -176,18 +170,18 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
         add(keyIvInputView)
         selectedAlg.addListener { _, _, newValue ->
             newValue?.run {
-                isEnableModAndPadding.value = newValue !in customAlg
+                enableModAndPadding.value = newValue !in customAlg
                 if (newValue in customAlg) {
-                    isEnableIv.value = false
+                    enableIv.value = false
                 }
                 println("alg $newValue")
             }
         }
         selectedMod.addListener { _, _, newValue ->
             newValue?.run {
-                isEnableIv.value = newValue != "ECB"
-                isEnableAEAD.value = newValue.contains(AEAD_MODE_REG)
-                if (isEnableAEAD.value) {
+                enableIv.value = newValue != "ECB"
+                enableAEAD.value = newValue.contains(AEAD_MODE_REG)
+                if (enableAEAD.value) {
                     selectedPadding.value = "NoPadding"
                 }
             }
@@ -206,10 +200,10 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                     if (isEncrypt) tgInput.selectToggle(tgInput.toggles[0])
                 }
             }
-            checkbox(messages["fileMode"], isFile)
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["fileMode"], fileProperty)
+            checkbox(messages["singleLine"], singleLine)
             button(messages["run"], imageview(IMG_RUN)) {
-                enableWhen(!isProcessing)
+                enableWhen(!processing)
                 action { doCrypto() }
             }
         }
@@ -217,16 +211,15 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
             addClass(Styles.left)
             label(messages["output"])
 
-            tgOutput =
-                togglegroup {
-                    radiobutton("raw")
-                    radiobutton("base64") { isSelected = true }
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        println("output ${newValue.cast<RadioButton>().text}")
-                        outputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgOutput = togglegroup {
+                radiobutton("raw")
+                radiobutton("base64") { isSelected = true }
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    println("output ${newValue.cast<RadioButton>().text}")
+                    outputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview(IMG_COPY)) {
                 tooltip(messages["copy"])
@@ -243,11 +236,10 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                 }
             }
         }
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
 
     override val root = borderpane {
@@ -258,12 +250,35 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
     private fun doCrypto() {
         runAsync {
             startTime = System.currentTimeMillis()
-            isProcessing.value = true
+            processing.value = true
             runCatching {
-                if (isEncrypt) {
-                    if (isFile.get()) {
+                    if (isEncrypt) {
+                        if (fileProperty.get()) {
+                            inputText.lineAction2String {
+                                controller.encryptByFile(
+                                    keyIvInputView.keyByteArray,
+                                    it,
+                                    keyIvInputView.ivByteArray,
+                                    cipher,
+                                    keyIvInputView.associatedData
+                                )
+                            }
+                        } else {
+                            controller.encrypt(
+                                keyIvInputView.keyByteArray,
+                                inputText,
+                                keyIvInputView.ivByteArray,
+                                cipher,
+                                selectedCharset.get(),
+                                singleLine.get(),
+                                inputEncode,
+                                outputEncode,
+                                keyIvInputView.associatedData
+                            )
+                        }
+                    } else if (fileProperty.get()) {
                         inputText.lineAction2String {
-                            controller.encryptByFile(
+                            controller.decryptByFile(
                                 keyIvInputView.keyByteArray,
                                 it,
                                 keyIvInputView.ivByteArray,
@@ -272,46 +287,23 @@ class SymmetricCryptoView : Fragment(messages["symmetricBlock"]) {
                             )
                         }
                     } else {
-                        controller.encrypt(
+                        controller.decrypt(
                             keyIvInputView.keyByteArray,
                             inputText,
                             keyIvInputView.ivByteArray,
                             cipher,
                             selectedCharset.get(),
-                            isSingleLine.get(),
+                            singleLine.get(),
                             inputEncode,
                             outputEncode,
                             keyIvInputView.associatedData
                         )
                     }
-                } else if (isFile.get()) {
-                    inputText.lineAction2String {
-                        controller.decryptByFile(
-                            keyIvInputView.keyByteArray,
-                            it,
-                            keyIvInputView.ivByteArray,
-                            cipher,
-                            keyIvInputView.associatedData
-                        )
-                    }
-                } else {
-                    controller.decrypt(
-                        keyIvInputView.keyByteArray,
-                        inputText,
-                        keyIvInputView.ivByteArray,
-                        cipher,
-                        selectedCharset.get(),
-                        isSingleLine.get(),
-                        inputEncode,
-                        outputEncode,
-                        keyIvInputView.associatedData
-                    )
                 }
-            }
                 .getOrElse { it.stacktrace() }
         } ui
             {
-                isProcessing.value = false
+                processing.value = false
                 taOutput.text = it
                 timeConsumption = System.currentTimeMillis() - startTime
                 labelInfo.text = info

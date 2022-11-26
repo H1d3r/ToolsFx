@@ -4,6 +4,8 @@ import java.nio.charset.Charset
 import me.leon.encode.*
 import me.leon.encode.base.BYTE_BITS
 import me.leon.encode.base.BYTE_MASK
+import me.leon.ext.crypto.BINARY_LEAD_REGEX
+import me.leon.ext.crypto.HEX_LEAD_REGEX
 import tornadofx.*
 
 const val HEX_RADIX = 16
@@ -21,25 +23,48 @@ fun String.hex2String(charset: String = "UTF-8") =
     hex2ByteArray().toString(Charset.forName(charset))
 
 fun String.hex2ByteArray() =
-    stripAllSpace().chunked(2).map { it.toInt(HEX_RADIX).toByte() }.toByteArray()
+    stripAllSpace()
+        .replace(HEX_LEAD_REGEX, "")
+        .chunked(2)
+        .map { it.toInt(HEX_RADIX).toByte() }
+        .toByteArray()
 
 fun String.hexReverse2ByteArray() =
     stripAllSpace().chunked(2).map { it.reversed().toInt(HEX_RADIX).toByte() }.toByteArray()
 
-fun ByteArray.toBinaryString() =
-    joinToString("") { (it.toInt() and BYTE_MASK).toString(2).padStart(BYTE_BITS, '0') }
+fun ByteArray.toBinaryString(padding: Boolean = true) =
+    joinToString("") {
+        (it.toInt() and BYTE_MASK).toString(2).run {
+            if (padding) padStart(BYTE_BITS, '0') else this
+        }
+    }
 
 /** 二进制编解码 */
 fun String.toBinaryString() = toByteArray().toBinaryString()
 
 fun String.binary2Ascii() = String(binary2ByteArray(), Charsets.UTF_8)
 
-fun String.binary2ByteArray() =
-    toList().chunked(BYTE_BITS).map { it.joinToString("").toInt(2).toByte() }.toByteArray()
+fun String.binary2ByteArray(reversed: Boolean = false) =
+    replace(BINARY_LEAD_REGEX, "")
+        .toList()
+        .chunked(BYTE_BITS)
+        .map { it.joinToString("").run { if (reversed) reversed() else this }.toInt(2).toByte() }
+        .toByteArray()
+
+fun String.binaryReverse(reversed: Boolean = false) =
+    if (reversed) {
+        replace(BINARY_LEAD_REGEX, "").toList().chunked(BYTE_BITS).joinToString("") {
+            it.joinToString("").reversed()
+        }
+    } else {
+        this
+    }
 
 /** unicode编解码 */
 fun String.toUnicodeString() =
-    fold(StringBuilder()) { acc, c -> acc.append("\\u").append(c.code.toString(HEX_RADIX)) }
+    fold(StringBuilder()) { acc, c ->
+            acc.append("\\u").append(c.code.toString(HEX_RADIX).padStart(4, '0'))
+        }
         .toString()
 
 /** js hex 编解码 \x61 */
@@ -50,20 +75,28 @@ fun String.toJsHexEncodeString() =
         .toString()
 
 /** js hex 解码 \x61 */
-fun String.jsHexDecodeString() =
-    split("(?i)\\\\x".toRegex())
-        .filterNot { it.isEmpty() }
-        .map { it.toInt(HEX_RADIX).toByte() }
-        .toByteArray()
-        .toString(Charsets.UTF_8)
+fun String.jsHexDecodeString(): String =
+    if (contains("\\x")) {
+        split("(?i)\\\\x".toRegex())
+            .filterNot { it.isEmpty() }
+            .map { it.toInt(HEX_RADIX).toByte() }
+            .toByteArray()
+            .toString(Charsets.UTF_8)
+    } else {
+        kotlin.error("wrong format")
+    }
 
 /** js octal 编解码 \141 */
 fun String.jsOctalDecodeString() =
-    split("(?i)\\\\".toRegex())
-        .filterNot { it.isEmpty() }
-        .map { it.toInt(OCTAL_RADIX).toByte() }
-        .toByteArray()
-        .toString(Charsets.UTF_8)
+    if (contains("\\")) {
+        split("\\\\".toRegex())
+            .filterNot { it.isEmpty() }
+            .map { it.toInt(OCTAL_RADIX).toByte() }
+            .toByteArray()
+            .toString(Charsets.UTF_8)
+    } else {
+        kotlin.error("wrong format")
+    }
 
 /** js octal 编码 \141 */
 fun String.toJsOctalEncodeString() =
@@ -102,17 +135,24 @@ fun String.htmlEntity2String() =
                     it.groupValues[1].toInt().toUnicodeChar()
                 }
         }
-    } else this
+    } else {
+        this
+    }
 
 /** htmlEntity编解码 */
 fun String.toHtmlEntity(radix: Int = 10, isAll: Boolean = true) =
     fold(StringBuilder()) { acc, c ->
-            if (isAll) acc.append(c.code.toHtmlEntityAll(radix))
-            else acc.append(c.code.toHtmlEntity() ?: c)
+            if (isAll) {
+                acc.append(c.code.toHtmlEntityAll(radix))
+            } else {
+                acc.append(c.code.toHtmlEntity() ?: c)
+            }
         }
         .toString()
 
 fun String.unicodeMix2String() =
     StringBuilder(this).replace(
-            "(?i:\\\\u\\+?[0-9a-zA-Z]{1,5}|(?i)&#x([0-9a-f]+);|&#(\\d+);)+".toRegex()
-        ) { it.value.unicode2String() }
+        "(?i:\\\\u\\+?[0-9a-f]{1,4}|(?i)&#x([0-9a-f]+);|&#(\\d+);)+".toRegex()
+    ) {
+        it.value.unicode2String()
+    }

@@ -1,6 +1,8 @@
 package me.leon
 
+import java.math.BigInteger
 import java.security.Security
+import kotlin.system.measureTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import me.leon.ext.crypto.EncodeType
@@ -103,7 +105,11 @@ class Tmp {
 
             strength = 12
             println(encode("123"))
-            assertTrue { matches("123", encode("123")) }
+            measureTimeMillis { assertTrue { matches("123", encode("123")) } }.also { println(it) }
+            strength = 14
+            measureTimeMillis { assertTrue { matches("123", encode("123")) } }.also { println(it) }
+            strength = 16
+            measureTimeMillis { assertTrue { matches("123", encode("123")) } }.also { println(it) }
             version = BCryptPasswordEncoder.BCryptVersion.`$2Y`
 
             println(encode("123"))
@@ -154,5 +160,30 @@ class Tmp {
     fun big() {
         "12".toBigInteger().toString(16).also { println(it) }
         println(EncodeType.values().joinToString(" "))
+    }
+
+    @Test
+    fun phi() {
+        val list =
+            mutableListOf(
+                    "2",
+                    "9857",
+                    "80990192745708230644342256236014173435685606613945005625896333595456890957431",
+                    "80990192745708230644342256236014173435685606613945005625896333595456890957431",
+                    "80990192745708230644342256236014173435685606613945005625896333595456890957431",
+                    "107843756547496736191228190917322558471918750590609940965721119253640998815543",
+                    "107843756547496736191228190917322558471918750590609940965721119253640998815543"
+                )
+                .map { it.toBigInteger() }
+
+        //        list.fold(list.product()) { acc, bigInteger ->
+        //            println(acc )
+        //            acc - acc / bigInteger
+        //        }.also { println(it) }
+        list
+            .groupBy { it }
+            .map { it.key to it.value.size }
+            .fold(BigInteger.ONE) { acc, pair -> acc * pair.first.eulerPhi(pair.second) }
+            .also { println(it) }
     }
 }

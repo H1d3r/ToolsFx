@@ -87,5 +87,7 @@ class ToolsApp : App(Home::class, Styles::class) {
             get() = properties["isEnableSymmetricStream"].toString().toBoolean()
         val isEnableQrcode: Boolean
             get() = properties["isEnableQrcode"].toString().toBoolean()
+        val offlineMode: Boolean
+            get() = (properties["offlineMode"] ?: "false").toString().toBoolean()
     }
 }

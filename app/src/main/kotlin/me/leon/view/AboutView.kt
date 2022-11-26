@@ -14,7 +14,7 @@ import tornadofx.FX.Companion.messages
 class AboutView : Fragment(messages["about"]) {
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isFetching = SimpleBooleanProperty(false)
+    private val fetching = SimpleBooleanProperty(false)
 
     private var txtLatestVersion: Text by singleAssign()
     private lateinit var releaseInfo: ReleaseInfo
@@ -35,14 +35,14 @@ class AboutView : Fragment(messages["about"]) {
         hyperlink(messages["license"]).action { LICENSE.openInBrowser() }
 
         button(messages["checkUpdate"]) {
-            enableWhen(!isFetching)
+            enableWhen(!fetching)
             action {
                 Prefs.isIgnoreUpdate = false
                 checkUpdate()
             }
         }
         button(messages["checkUpdateDev"]) {
-            enableWhen(!isFetching)
+            enableWhen(!fetching)
             action {
                 Prefs.isIgnoreUpdate = false
                 checkUpdateDev()
@@ -51,45 +51,54 @@ class AboutView : Fragment(messages["about"]) {
         txtLatestVersion = text()
         hyperlink("蓝奏云下载 密码52pj").action { LAN_ZOU_DOWNLOAD_URL.openInBrowser() }
         hyperlink("插件下载 密码ax63").action { LAN_ZOU_PLUGIN_DOWNLOAD_URL.openInBrowser() }
-        if (VERSION.contains("beta")) checkUpdateDev(!Prefs.isIgnoreUpdate)
-        else checkUpdate(!Prefs.isIgnoreUpdate)
+        if (VERSION.contains("beta")) {
+            checkUpdateDev(!Prefs.isIgnoreUpdate)
+        } else {
+            checkUpdate(!Prefs.isIgnoreUpdate)
+        }
     }
 
     private fun checkUpdateDev(isAuto: Boolean = true) {
         if (!isAuto) return
         runAsync {
-            isFetching.value = true
+            fetching.value = true
             DEV_UPDATE_URL.readFromNet(DEV_UPDATE_URL2)
         } ui
             {
-                isFetching.value = false
+                fetching.value = false
                 releaseInfo = it.fromJson(ReleaseInfo::class.java)
                 txtLatestVersion.text =
-                    if (it.isEmpty()) messages["unknown"]
-                    else if (VERSION != releaseInfo.version) {
+                    if (it.isEmpty()) {
+                        messages["unknown"]
+                    } else if (VERSION != releaseInfo.version) {
                         "${messages["latestVer"]} v${releaseInfo.version}".also {
                             find<UpdateFragment>(mapOf("releaseInfo" to releaseInfo)).openModal()
                         }
-                    } else messages["alreadyLatest"]
+                    } else {
+                        messages["alreadyLatest"]
+                    }
             }
     }
 
     private fun checkUpdate(isAuto: Boolean = true) {
         if (!isAuto) return
         runAsync {
-            isFetching.value = true
+            fetching.value = true
             CHECK_UPDATE_URL.readFromNet(CHECK_UPDATE_URL2)
         } ui
             {
-                isFetching.value = false
+                fetching.value = false
                 releaseInfo = it.fromJson(ReleaseInfo::class.java)
                 txtLatestVersion.text =
-                    if (it.isEmpty()) messages["unknown"]
-                    else if (!VERSION.contains("beta") && VERSION != releaseInfo.version) {
+                    if (it.isEmpty()) {
+                        messages["unknown"]
+                    } else if (!VERSION.contains("beta") && VERSION != releaseInfo.version) {
                         "${messages["latestVer"]} v${releaseInfo.version}".also {
                             find<UpdateFragment>(mapOf("releaseInfo" to releaseInfo)).openModal()
                         }
-                    } else messages["alreadyLatest"]
+                    } else {
+                        messages["alreadyLatest"]
+                    }
             }
     }
 }

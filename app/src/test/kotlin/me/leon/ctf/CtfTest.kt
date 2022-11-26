@@ -26,9 +26,9 @@ class CtfTest {
         val d = "HelloWorldab"
         val d2 = "gesfcinphodtmwuqouryzejrehbxvalookT"
         val d3 = "The quick brown fox jumps over the lazy dog".replace(" ", "")
-        assertEquals("lrbaoleWdloH", d.curveCipher(3, 4))
         assertEquals(d, "lrbaoleWdloH".curveCipherDecode(3, 4))
         assertEquals("Thequickbrownfoxjumpsoverthelazydog", d2.curveCipherDecode(5, 7))
+        assertEquals("lrbaoleWdloH", d.curveCipher(3, 4))
         assertEquals(d2, d3.curveCipher(5, 7))
     }
 
@@ -178,6 +178,30 @@ class CtfTest {
     }
 
     @Test
+    fun brainFuckEncode() {
+        val engine = BrainfuckEngine()
+
+        // for test
+        //        (0..126).forEach {
+        //            val loops = it.pointerLoopCalculate().translate()
+        //            println("$it = " + engine.interpret(loops))
+        //        }
+
+        val message = "HelloWorld!"
+
+        assertEquals(message, message.encode().brainFuckDecrypt())
+        assertEquals(message, message.brainFuckShortEncode().brainFuckDecrypt())
+
+        val encodeShort = message.brainFuckShortEncode()
+        assertEquals(message, engine.interpret(encodeShort))
+
+        val troll = message.brainFuckShortEncode(TrollScriptEngine.Token)
+        assertEquals(message, troll.trollScriptDecrypt())
+        val ook = message.brainFuckShortEncode(OokEngine.Token)
+        assertEquals(message, ook.ookDecrypt())
+    }
+
+    @Test
     fun b100() {
         val s = "hello开发工具箱".toByteArray()
         val encoded = s.base100()
@@ -225,7 +249,31 @@ class CtfTest {
     @Test
     fun zwc() {
         val d = "w\u200D\uFEFF\u200C\u200B\u200D\uFEFF\u200D\u200B\u200D\uFEFF\uFEFFhat"
-        assertEquals(d, "abc".zwc("what"))
-        assertEquals("abc", d.zwcDecode())
+        assertEquals(d, "abc".zwcBinary("what"))
+        assertEquals("abc", d.zwcBinaryDecode())
+
+        println(
+            ("春风再美也比上你的笑，\u200C\u200D\u200C\u200B\u200D\u200D\u200D\u200B\u200C\u200C\u200C\u200D\u200B" +
+                    "\u200C\u200B\u200C\u200D\u200C\u200C\u200B\u200C\u200D\u200B\u200C\u200C\u200C\u200B" +
+                    "\u200D没见过你的人不会明了")
+                .zwcMorseDecode()
+        )
+
+        val encrypt =
+            "a\u200C\u200C\u200C\u200C\u200B\u200C\u200B\u200C\u200D\u200C\u200C\u200B\u200C" +
+                "\u200D\u200C\u200C\u200B\u200D\u200D\u200Dbce"
+        assertEquals(encrypt, "hello".zwcMorse("abce"))
+        assertEquals("hello", encrypt.zwcMorseDecode())
+
+        val raw = "隐藏hide数据"
+        val hide =
+            "w\u200D\u200C\u200C\u200D\u200C\u200D\u200D\u200C\u200D\u200C\u200C\u200D\u200C\u200C\u200C\u200C\u200B" +
+                "\u200D\u200C\u200C\u200C\u200C\u200D\u200C\u200D\u200D\u200D\u200C\u200C\u200D\u200D\u200D\u200D" +
+                "\u200B\u200C\u200C\u200C\u200C\u200B\u200C\u200C\u200B\u200D\u200C\u200C\u200B\u200C\u200B\u200D" +
+                "\u200D\u200C\u200C\u200D\u200C\u200D\u200C\u200D\u200D\u200D\u200C\u200C\u200C\u200C\u200B\u200D" +
+                "\u200D\u200C\u200C\u200C\u200D\u200D\u200C\u200D\u200D\u200C\u200D\u200D\u200D\u200Chere is flag"
+
+        assertEquals(hide, raw.zwcMorse("where is flag"))
+        assertEquals(raw, hide.zwcMorseDecode())
     }
 }

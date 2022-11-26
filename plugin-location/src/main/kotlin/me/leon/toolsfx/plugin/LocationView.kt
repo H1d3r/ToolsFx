@@ -27,16 +27,8 @@ class LocationView : PluginFragment("LocationView") {
         get() = taInput.text.trim()
     private val outputText: String
         get() = taOutput.text
-    private val isSingleLine = SimpleBooleanProperty(false)
-    private val eventHandler = fileDraggedHandler {
-        taInput.text =
-            with(it.first()) {
-                if (length() <= 10 * 1024 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 10M"
-            }
-    }
+    private val singleLine = SimpleBooleanProperty(false)
+    private val eventHandler = fileDraggedHandler { taInput.text = it.first().properText() }
 
     private val promptList =
         arrayOf(
@@ -60,12 +52,11 @@ class LocationView : PluginFragment("LocationView") {
             }
         }
 
-        taInput =
-            textarea {
-                isWrapText = true
-                onDragEntered = eventHandler
-                promptText = promptList.first()
-            }
+        taInput = textarea {
+            isWrapText = true
+            onDragEntered = eventHandler
+            promptText = promptList.first()
+        }
         hbox {
             alignment = Pos.CENTER_LEFT
             paddingTop = DEFAULT_SPACING
@@ -86,10 +77,11 @@ class LocationView : PluginFragment("LocationView") {
                     selectedToggleProperty().addListener { _, _, new ->
                         locationServiceType = new.cast<RadioButton>().text.locationServiceType()
                         taInput.promptText =
+                            @Suppress("ElseCaseInsteadOfExhaustiveWhen")
                             when (locationServiceType) {
                                 LocationServiceType.DISTANCE -> promptList[1]
-                                LocationServiceType.GEO_BD, LocationServiceType.GEO_AMPA ->
-                                    promptList.last()
+                                LocationServiceType.GEO_BD,
+                                LocationServiceType.GEO_AMPA -> promptList.last()
                                 else -> promptList.first()
                             }
                         println(locationServiceType)
@@ -102,7 +94,7 @@ class LocationView : PluginFragment("LocationView") {
             alignment = Pos.CENTER_LEFT
             spacing = DEFAULT_SPACING
             paddingLeft = DEFAULT_SPACING
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
 
             button(messages["run"], imageview(IMG_RUN)) { action { doProcess() } }
             button("百度坐标拾取") {
@@ -127,16 +119,15 @@ class LocationView : PluginFragment("LocationView") {
                 }
             }
         }
-        taOutput =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-            }
+        taOutput = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+        }
     }
 
     private fun doProcess() {
         if (inputText.isEmpty()) return
-        runAsync { controller.process(locationServiceType, inputText, isSingleLine.get()) } ui
+        runAsync { controller.process(locationServiceType, inputText, singleLine.get()) } ui
             {
                 taOutput.text = it
             }

@@ -37,9 +37,8 @@ class Home : View("${messages["appName"]} v$VERSION build $BUILD_DATE") {
         if (isEnableQrcode) views.add(QrcodeView::class)
         if (isEnablePBE) views.add(PBEView::class)
         if (isEnableInternalWebview) {
-            runCatching { Class.forName("javafx.scene.web.WebView") }.onSuccess {
-                views.add(OnlineWebView::class)
-            }
+            runCatching { Class.forName("javafx.scene.web.WebView") }
+                .onSuccess { views.add(OnlineWebView::class) }
         }
     }
 
@@ -62,26 +61,34 @@ class Home : View("${messages["appName"]} v$VERSION build $BUILD_DATE") {
         tab<AboutView>()
         primaryStage.isAlwaysOnTop = Prefs.alwaysOnTop
         contextmenu {
-            item("Top ${"  √".takeIf { Prefs.alwaysOnTop } ?: ""}") {
+            item("Top ${"  √".takeIf { Prefs.alwaysOnTop }.orEmpty()}") {
                 action {
                     Prefs.alwaysOnTop = !Prefs.alwaysOnTop
                     primaryStage.isAlwaysOnTop = Prefs.alwaysOnTop
-                    text = "Top ${"  √".takeIf { Prefs.alwaysOnTop } ?: ""}"
+                    text = "Top ${"  √".takeIf { Prefs.alwaysOnTop }.orEmpty()}"
                 }
             }
             menu("Language") {
-                item("English(require restart)${"  √".takeIf { Prefs.language != "zh" } ?: ""}") {
+                item(
+                    "English(require restart)${"  √".takeIf { Prefs.language != "zh" }.orEmpty()}"
+                ) {
                     action { Prefs.language = "en" }
                 }
-                item("中文(需重启)${"  √".takeIf { Prefs.language == "zh" } ?: ""}") {
+                item("中文(需重启)${"  √".takeIf { Prefs.language == "zh" }.orEmpty()}") {
                     action { Prefs.language = "zh" }
                 }
             }
 
-            item("${messages["autoCopy"]}${"  √".takeIf { Prefs.autoCopy } ?: ""}") {
+            item("HiDpi (require restart) ${"  √".takeIf { Prefs.hidpi }.orEmpty()}") {
+                action {
+                    Prefs.hidpi = !Prefs.hidpi
+                    text = "HiDpi (require restart) ${"  √".takeIf { Prefs.hidpi }.orEmpty()}"
+                }
+            }
+            item("${messages["autoCopy"]}${"  √".takeIf { Prefs.autoCopy }.orEmpty()}") {
                 action {
                     Prefs.autoCopy = !Prefs.autoCopy
-                    text = "${messages["autoCopy"]}${"  √".takeIf { Prefs.autoCopy } ?: ""}"
+                    text = "${messages["autoCopy"]}${"  √".takeIf { Prefs.autoCopy }.orEmpty()}"
                 }
             }
 

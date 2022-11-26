@@ -1,10 +1,11 @@
 package me.leon.ext
 
 import java.nio.charset.Charset
+import me.leon.encode.*
 import me.leon.encode.base.base64
 import me.leon.encode.base.base64Decode
-import me.leon.encode.octal
-import me.leon.encode.octalDecode
+import me.leon.ext.crypto.BINARY_REGEX
+import me.leon.ext.crypto.HEX_WITH_LEAD_REGEX
 
 val ENCODERS = listOf("raw", "hex", "base64", "oct", "binary")
 
@@ -31,6 +32,22 @@ fun String.decodeToByteArray(encoder: String = "raw", charset: String = "UTF-8")
         else -> error("Unknown encoder: $encoder")
     }
 
+/**
+ * 自动解码成 ByteArray
+ *
+ * 0b/0B, 按照二进制解码 0x/0X, 按照十六进制解码
+ */
+fun String.autoDecodeToByteArray(isDecode: Boolean = false): ByteArray =
+    if (length < 3) {
+        toByteArray()
+    } else {
+        when {
+            BINARY_REGEX.matches(this) -> binary2ByteArray()
+            isDecode || HEX_WITH_LEAD_REGEX.matches(this) -> hex2ByteArray()
+            else -> toByteArray()
+        }
+    }
+
 fun ByteArray.encodeTo(encoder: String, charset: String = "UTF-8") =
     when (encoder) {
         "raw" -> toString(Charset.forName(charset))
@@ -40,3 +57,14 @@ fun ByteArray.encodeTo(encoder: String, charset: String = "UTF-8") =
         "binary" -> toBinaryString()
         else -> error("Unknown encoder: $encoder")
     }
+
+/**
+ * UTF_32LE --> UTF_32BE 再转为 int
+ *
+ * 作用和python的stack.unpack('<1',bytes([1,2,3,4]))方法一致
+ */
+fun ByteArray.unpack(): Int {
+    require(size == 4)
+    reverse()
+    return fold(0) { acc, byte -> acc shl 8 or (byte.toInt() and 0xff) }
+}

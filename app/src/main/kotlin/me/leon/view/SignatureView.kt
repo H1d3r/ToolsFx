@@ -112,7 +112,7 @@ class SignatureView : Fragment(messages["signVerify"]) {
     private var outputEncode = "base64"
 
     override val closeable = SimpleBooleanProperty(false)
-    private val isSingleLine = SimpleBooleanProperty(false)
+    private val singleLine = SimpleBooleanProperty(false)
     private val selectedKeyPairAlg = SimpleStringProperty(keyPairAlgs.keys.first())
     private val selectedSigAlg = SimpleStringProperty(keyPairAlgs.values.first().first())
 
@@ -133,23 +133,16 @@ class SignatureView : Fragment(messages["signVerify"]) {
     private val eventHandler = fileDraggedHandler {
         taKey.text =
             with(it.first()) {
-                if (extension in listOf("pk8", "key", "der")) readBytes().base64()
-                else if (extension in listOf("cer", "crt")) parsePublicKeyFromCerFile()
-                else if (length() <= 10 * 1024 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 10M"
+                if (extension in listOf("pk8", "key", "der")) {
+                    readBytes().base64()
+                } else if (extension in listOf("cer", "crt")) {
+                    parsePublicKeyFromCerFile()
+                } else {
+                    properText()
+                }
             }
     }
-    private val inputEventHandler = fileDraggedHandler {
-        taRaw.text =
-            with(it.first()) {
-                if (length() <= 128 * 1024) {
-                    if (realExtension() in unsupportedExts) "unsupported file extension"
-                    else readText()
-                } else "not support file larger than 128KB"
-            }
-    }
+    private val inputEventHandler = fileDraggedHandler { taRaw.text = it.first().properText() }
 
     private val info
         get() =
@@ -163,28 +156,26 @@ class SignatureView : Fragment(messages["signVerify"]) {
         hbox {
             label(messages["plain"])
             addClass(Styles.left)
-            tgInput =
-                togglegroup {
-                    radiobutton("raw") { isSelected = true }
-                    radiobutton("base64")
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        inputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgInput = togglegroup {
+                radiobutton("raw") { isSelected = true }
+                radiobutton("base64")
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    inputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview("/img/import.png")) {
                 tooltip(messages["pasteFromClipboard"])
                 action { taRaw.text = clipboardText() }
             }
         }
-        taRaw =
-            textarea {
-                promptText = messages["inputHint"]
-                isWrapText = true
-                onDragEntered = inputEventHandler
-                prefHeight = DEFAULT_SPACING_16X
-            }
+        taRaw = textarea {
+            promptText = messages["inputHint"]
+            isWrapText = true
+            onDragEntered = inputEventHandler
+            prefHeight = DEFAULT_SPACING_16X
+        }
         hbox {
             label(messages["key"])
             button(graphic = imageview("/img/import.png")) {
@@ -192,12 +183,11 @@ class SignatureView : Fragment(messages["signVerify"]) {
                 action { taKey.text = clipboardText() }
             }
         }
-        taKey =
-            textarea {
-                promptText = messages["inputHintAsy"]
-                isWrapText = true
-                onDragEntered = eventHandler
-            }
+        taKey = textarea {
+            promptText = messages["inputHintAsy"]
+            isWrapText = true
+            onDragEntered = eventHandler
+        }
 
         hbox {
             addClass(Styles.left)
@@ -230,7 +220,7 @@ class SignatureView : Fragment(messages["signVerify"]) {
             alignment = Pos.CENTER
             paddingTop = DEFAULT_SPACING
             hgap = DEFAULT_SPACING_4X
-            checkbox(messages["singleLine"], isSingleLine)
+            checkbox(messages["singleLine"], singleLine)
             button(messages["priSig"]) {
                 action { sign() }
                 setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE)
@@ -243,14 +233,13 @@ class SignatureView : Fragment(messages["signVerify"]) {
         hbox {
             addClass(Styles.left)
             label(messages["sig"])
-            tgOutput =
-                togglegroup {
-                    radiobutton("base64") { isSelected = true }
-                    radiobutton("hex")
-                    selectedToggleProperty().addListener { _, _, newValue ->
-                        outputEncode = newValue.cast<RadioButton>().text
-                    }
+            tgOutput = togglegroup {
+                radiobutton("base64") { isSelected = true }
+                radiobutton("hex")
+                selectedToggleProperty().addListener { _, _, newValue ->
+                    outputEncode = newValue.cast<RadioButton>().text
                 }
+            }
 
             button(graphic = imageview(IMG_COPY)) {
                 tooltip(messages["copy"])
@@ -258,12 +247,11 @@ class SignatureView : Fragment(messages["signVerify"]) {
             }
         }
 
-        taSigned =
-            textarea {
-                promptText = messages["outputHint"]
-                isWrapText = true
-                prefHeight = DEFAULT_SPACING_10X
-            }
+        taSigned = textarea {
+            promptText = messages["outputHint"]
+            isWrapText = true
+            prefHeight = DEFAULT_SPACING_10X
+        }
     }
     override val root = borderpane {
         center = centerNode
@@ -274,16 +262,16 @@ class SignatureView : Fragment(messages["signVerify"]) {
         runAsync {
             startTime = System.currentTimeMillis()
             runCatching {
-                controller.sign(
-                    selectedKeyPairAlg.get(),
-                    selectedSigAlg.get(),
-                    key,
-                    msg,
-                    inputEncode,
-                    outputEncode,
-                    isSingleLine.get()
-                )
-            }
+                    controller.sign(
+                        selectedKeyPairAlg.get(),
+                        selectedSigAlg.get(),
+                        key,
+                        msg,
+                        inputEncode,
+                        outputEncode,
+                        singleLine.get()
+                    )
+                }
                 .getOrElse { it.stacktrace() }
         } ui
             {
@@ -296,18 +284,18 @@ class SignatureView : Fragment(messages["signVerify"]) {
     private fun verify() =
         runAsync {
             runCatching {
-                startTime = System.currentTimeMillis()
-                controller.verify(
-                    selectedKeyPairAlg.get(),
-                    selectedSigAlg.get(),
-                    key,
-                    msg,
-                    inputEncode,
-                    outputEncode,
-                    signText,
-                    isSingleLine.get()
-                )
-            }
+                    startTime = System.currentTimeMillis()
+                    controller.verify(
+                        selectedKeyPairAlg.get(),
+                        selectedSigAlg.get(),
+                        key,
+                        msg,
+                        inputEncode,
+                        outputEncode,
+                        signText,
+                        singleLine.get()
+                    )
+                }
                 .getOrElse { it.stacktrace() }
         } ui
             { state ->
