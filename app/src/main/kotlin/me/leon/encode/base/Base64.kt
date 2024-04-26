@@ -43,8 +43,7 @@ fun String.base64Decode(dict: String = BASE64_DICT) =
                 .padding("0", BASE64_BLOCK_SIZE, false)
         }
         .chunked(BYTE_BITS)
-        .filter { it.length == BYTE_BITS }
-        .map { (it.toInt(2) and BYTE_MASK).toByte() }
+        .map { (it.padEnd(BYTE_BITS, '0').toInt(2) and BYTE_MASK).toByte() }
         .toByteArray()
 
 fun ByteArray.base64Decode(dict: String = BASE64_DICT) = decodeToString().base64Decode(dict)

@@ -120,9 +120,15 @@ class StringCompression {
         val compressed =
             Compression.LZString.compress(data.toByteArray()).base64().also { println(it) }
         val decompressed =
-            Compression.LZString.decompress(compressed.base64Decode()).decodeToString().also {
-                println(it)
-            }
+            Compression.LZString.decompress(compressed.base64Decode()).decodeToString()
         assertEquals(data, decompressed)
+
+        val bytes =
+            "IIEwbghgdgxgpiABASyiOUAuiDmBXZdAZ0QBtU5EALZHK8uzVHRGaRAI0owg9IUQAzAPYAnIA==="
+                .base64Decode()
+        assertEquals(
+            "Advanced indent guides line highlighting can be enabled for",
+            Compression.LZString.decompress(bytes).decodeToString()
+        )
     }
 }
